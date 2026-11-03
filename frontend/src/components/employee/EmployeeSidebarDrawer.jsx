@@ -171,7 +171,7 @@ export default function EmployeeSidebarDrawer({ isOpen, onClose }) {
                   <span
                     style={{
                       marginLeft: 'auto',
-                      backgroundColor: '#ef4444',
+                      backgroundColor: '#F04491',
                       color: '#ffffff',
                       fontSize: '0.7rem',
                       fontWeight: 700,

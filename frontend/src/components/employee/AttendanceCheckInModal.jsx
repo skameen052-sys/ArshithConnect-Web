@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, RefreshCw, Check, X, MapPin, AlertTriangle, Loader2, ShieldCheck, MapPinOff, Home, Play, ExternalLink, Clock } from 'lucide-react';
 import { attendanceService } from '../../services/attendanceService';
 
@@ -676,10 +677,34 @@ export default function AttendanceCheckInModal({ isOpen, onClose, onCheckInSucce
     setStep('camera');
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     stopCamera();
     onClose();
-  };
+  }, [stopCamera, onClose]);
+
+  // Prevent background page from scrolling while modal is active
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  // Keyboard shortcut: Escape to cancel / close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isSubmitting, handleClose]);
 
   // Submit Check-In to Backend
   const handleConfirmCheckIn = async () => {
@@ -755,9 +780,23 @@ export default function AttendanceCheckInModal({ isOpen, onClose, onCheckInSucce
 
   if (!isOpen) return null;
 
-  return (
-    <div className="attendance-modal-overlay">
-      <div className="attendance-modal-container animate-fade-in" style={{ maxWidth: '500px' }}>
+  const modalContent = (
+    <div
+      className="attendance-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) {
+          handleClose();
+        }
+      }}
+    >
+      <div
+        className="attendance-modal-container"
+        style={{ maxWidth: '500px' }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="attendance-modal-title"
+      >
         {/* Modal Header */}
         <div className="attendance-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -765,7 +804,7 @@ export default function AttendanceCheckInModal({ isOpen, onClose, onCheckInSucce
               <ShieldCheck size={20} color="#059669" />
             </div>
             <div>
-              <h2 className="attendance-modal-title">Attendance Check-In</h2>
+              <h2 id="attendance-modal-title" className="attendance-modal-title">Attendance Check-In</h2>
               <span className="attendance-modal-subtitle">
                 {workMode === 'WFO'
                   ? 'GPS Geofence & Live Camera Verification • WFO (Office)'
@@ -1293,4 +1332,8 @@ export default function AttendanceCheckInModal({ isOpen, onClose, onCheckInSucce
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }

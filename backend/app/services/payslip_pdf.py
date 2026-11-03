@@ -299,10 +299,10 @@ def generate_payslip_pdf(detail: Dict[str, Any], run_info: Dict[str, Any]) -> by
     designation = str(detail.get("designation") or "Python Developer")
     gender = str(detail.get("gender") or "Male")
 
-    bank_name = str(detail.get("bank_name") or "IDFC FIRST BANK")
-    bank_acct = str(detail.get("account_number") or detail.get("bank_account_no") or "87387687323")
-    pan_no = str(detail.get("pan_number") or detail.get("pan") or "GF837FEYB73")
-    uan_no = str(detail.get("uan_number") or detail.get("uan") or "27368873212")
+    bank_name = str(detail.get("bank_name") or detail.get("bankName") or "—")
+    bank_acct = str(detail.get("account_number") or detail.get("accountNumber") or detail.get("bank_account_no") or "—")
+    pan_no = str(detail.get("pan_number") or detail.get("panNumber") or detail.get("pan") or "—")
+    uan_no = str(detail.get("uan_number") or detail.get("uanNumber") or detail.get("uan") or detail.get("pf_number") or "—")
 
     total_days = float(detail.get("total_days") or 31.0)
     paid_days = float(detail.get("payable_days") or detail.get("paid_days") or total_days)

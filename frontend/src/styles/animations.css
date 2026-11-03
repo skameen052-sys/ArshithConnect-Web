@@ -1,0 +1,493 @@
+/* ==========================================================================
+   Arshith Connect - Professional Animation System
+   Engineered for smooth, high-performance, enterprise-grade micro-interactions
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. KEYFRAME DEFINITIONS
+   -------------------------------------------------------------------------- */
+
+/* Page & Section Entrance */
+@keyframes fadeSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeScaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal Spring Entrance */
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSpringIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.015) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Check-In / Check-Out Celebration Animations */
+@keyframes celebrationPopup {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(20px);
+  }
+  50% {
+    transform: scale(1.03) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pulseRingGreen {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes pulseRingBlue {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes checkmarkStroke {
+  0% {
+    stroke-dashoffset: 48;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes checkmarkCircle {
+  0% {
+    stroke-dashoffset: 166;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes confettiDrift {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(220px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes radarBeacon {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes radarBeaconBlue {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes buttonShimmerHighlight {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  20%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes countdownBar {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2. REUSABLE ANIMATION UTILITY CLASSES
+   -------------------------------------------------------------------------- */
+
+/* Enhanced Page & View Fade-in */
+.animate-fade-in {
+  animation: fadeSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+.animate-slide-down {
+  animation: fadeSlideDown 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: fadeScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-spring {
+  animation: modalSpringIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Smooth Interactive Card Lift */
+.card-hover-lift,
+.dashboard-card,
+.attendance-summary-card,
+.stat-card,
+.metric-card,
+.quick-action-card,
+.work-update-card {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s ease !important;
+}
+
+.card-hover-lift:hover,
+.quick-action-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Interactive Button Click Micro-pop */
+button:not(:disabled):active,
+.btn-primary-action:not(:disabled):active,
+.btn-check-in:not(:disabled):active,
+.btn-check-out:not(:disabled):active {
+  transform: scale(0.975) !important;
+  transition: transform 0.08s ease !important;
+}
+
+/* Subtle Shimmer on Primary Action Buttons */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.25), 
+    transparent
+  );
+  animation: buttonShimmerHighlight 4s infinite ease-in-out;
+  pointer-events: none;
+}
+
+/* Radar Beacon on Active/Checked-In Badges */
+.badge-beacon-green {
+  position: relative;
+}
+
+.badge-beacon-green::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  animation: radarBeacon 2s infinite ease-out;
+  pointer-events: none;
+}
+
+.badge-beacon-blue {
+  position: relative;
+}
+
+.badge-beacon-blue::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  animation: radarBeaconBlue 2s infinite ease-out;
+  pointer-events: none;
+}
+
+/* Smooth Table Row Transitions */
+table tbody tr {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+table tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Form Input Focus Glow Animation */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+/* Skeleton Loading Wave */
+.skeleton-loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 25%,
+    #e2e8f0 50%,
+    #f1f5f9 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.6s infinite linear;
+}
+
+/* --------------------------------------------------------------------------
+   3. CHECK-IN / CHECK-OUT CELEBRATION MODAL STYLES
+   -------------------------------------------------------------------------- */
+
+.attendance-celebration-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+  animation: modalBackdropIn 0.25s ease-out forwards;
+}
+
+.attendance-celebration-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 24px;
+  max-width: 480px;
+  width: 100%;
+  padding: 36px 28px 28px;
+  text-align: center;
+  overflow: hidden;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.3),
+              0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  animation: celebrationPopup 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Decorative Glow Aura Behind Icon */
+.celebration-glow-aura {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  filter: blur(45px);
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+.celebration-glow-aura.green {
+  background: radial-gradient(circle, #34d399 0%, #10b981 40%, transparent 70%);
+}
+
+.celebration-glow-aura.blue {
+  background: radial-gradient(circle, #60a5fa 0%, #3b82f6 40%, transparent 70%);
+}
+
+/* Icon Container with Pulsing Rings */
+.celebration-icon-wrapper {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.celebration-pulse-ring {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.celebration-pulse-ring.green {
+  background-color: rgba(16, 185, 129, 0.25);
+  animation: pulseRingGreen 2s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.celebration-pulse-ring.blue {
+  background-color: rgba(37, 99, 235, 0.25);
+  animation: pulseRingBlue 2s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.celebration-icon-circle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 2;
+}
+
+.celebration-icon-circle.green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.celebration-icon-circle.blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+/* Floating Confetti Particle */
+.celebration-confetti-particle {
+  position: absolute;
+  top: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confettiDrift 3s ease-in forwards;
+}
+
+/* Animated SVG Checkmark */
+.animated-checkmark-svg {
+  width: 48px;
+  height: 48px;
+}
+
+.animated-checkmark-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 3;
+  stroke: rgba(255, 255, 255, 0.4);
+  fill: none;
+  animation: checkmarkCircle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.animated-checkmark-check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  stroke-width: 4;
+  stroke: #ffffff;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  animation: checkmarkStroke 0.35s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+}
+
+/* Auto-dismiss countdown bar at bottom */
+.celebration-timer-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background-color: #10b981;
+  animation: countdownBar 3.5s linear forwards;
+}
+
+.celebration-timer-bar.blue {
+  background-color: #3b82f6;
+}
+
+/* ==========================================================================
+   Reduced Motion Accessibility Preference
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+

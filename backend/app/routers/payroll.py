@@ -196,6 +196,34 @@ def finalize_payroll_run(run_id: str, payload: PayrollActionRequest, current_use
         emp_email = str(d.get("employee_email") or "")
         emp_doc_id = str(d.get("employee_doc_id") or "")
         ps_num = f"PS-{year}{month:02d}-{emp_code or emp_id}"
+
+        # Fetch latest employee profile to pick up personal/banking/statutory info kept by employee
+        latest_emp = None
+        if emp_doc_id:
+            latest_emp = FirestoreService.get_by_id("employees", emp_doc_id)
+        if not latest_emp and emp_code:
+            matches = FirestoreService.query("employees", {"employee_id": emp_code})
+            if matches:
+                latest_emp = matches[0]
+        if not latest_emp and emp_id:
+            latest_emp = FirestoreService.get_by_id("employees", emp_id)
+        if not latest_emp and emp_email:
+            matches = FirestoreService.query("employees", {"email": emp_email})
+            if matches:
+                latest_emp = matches[0]
+
+        final_bank_name = (latest_emp.get("bank_name") or latest_emp.get("bankName") if latest_emp else None) or d.get("bank_name") or "—"
+        final_acct_no = (latest_emp.get("account_number") or latest_emp.get("accountNumber") or latest_emp.get("bank_account_no") if latest_emp else None) or d.get("account_number") or "—"
+        final_pan_no = (latest_emp.get("pan_number") or latest_emp.get("panNumber") or latest_emp.get("pan") if latest_emp else None) or d.get("pan_number") or "—"
+        final_uan_no = (latest_emp.get("uan_number") or latest_emp.get("uanNumber") or latest_emp.get("uan") or latest_emp.get("pf_number") if latest_emp else None) or d.get("uan_number") or "—"
+        final_desig = (latest_emp.get("designation") or latest_emp.get("role") if latest_emp else None) or d.get("designation") or "Operations Associate"
+
+        # Update detail payload
+        d["bank_name"] = final_bank_name
+        d["account_number"] = final_acct_no
+        d["pan_number"] = final_pan_no
+        d["uan_number"] = final_uan_no
+        d["designation"] = final_desig
         
         payslip_doc = {
             "payslip_number": ps_num,
@@ -206,7 +234,7 @@ def finalize_payroll_run(run_id: str, payload: PayrollActionRequest, current_use
             "employee_doc_id": emp_doc_id,
             "employee_name": d.get("employee_name"),
             "department": d.get("department"),
-            "designation": d.get("designation"),
+            "designation": final_desig,
             "month": month,
             "year": year,
             "month_name": month_name,
@@ -234,10 +262,10 @@ def finalize_payroll_run(run_id: str, payload: PayrollActionRequest, current_use
             "loan_deduction": d.get("loan_deduction", 0.0),
             "total_deductions": d.get("total_deductions", 0.0),
             "net_salary": d.get("net_salary", 0.0),
-            "bank_name": d.get("bank_name", "IDFC FIRST BANK"),
-            "account_number": d.get("account_number", "87387687323"),
-            "pan_number": d.get("pan_number", "GF837FEYB73"),
-            "uan_number": d.get("uan_number", "27368873212"),
+            "bank_name": final_bank_name,
+            "account_number": final_acct_no,
+            "pan_number": final_pan_no,
+            "uan_number": final_uan_no,
             "company_name": "ARSHITH FRESH INDIA PVT LTD",
             "company_address": "Bangalore, Karnataka, Pincode: 560102",
             "date_of_joining": d.get("date_of_joining", "16-Jan-2025"),

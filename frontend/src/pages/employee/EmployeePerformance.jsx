@@ -57,7 +57,7 @@ export default function EmployeePerformance() {
   };
 
   return (
-    <div className="hrms-page-container animate-fade-in" style={{ maxWidth: '1060px', margin: '0 auto', padding: '16px' }}>
+    <div className="hrms-page-container animate-fade-in" style={{ maxWidth: '100%', boxSizing: 'border-box', marginBottom: '36px' }}>
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -152,7 +152,7 @@ export default function EmployeePerformance() {
                 </div>
 
                 {/* Score & Category */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                   <div
                     style={{
                       textAlign: 'center',
@@ -211,7 +211,7 @@ export default function EmployeePerformance() {
               </div>
 
               {/* Feedback Highlights Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginTop: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '14px', marginTop: '16px' }}>
                 {/* Strengths */}
                 <div
                   style={{
@@ -308,7 +308,7 @@ export default function EmployeePerformance() {
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0b3d2b', marginBottom: '14px' }}>
                 Appraisal History
               </h3>
-              <div className="table-responsive">
+              <div className="hrms-table-container">
                 <table className="hrms-table">
                   <thead>
                     <tr>

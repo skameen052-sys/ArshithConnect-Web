@@ -481,6 +481,35 @@ export default function AdminEmployeeList() {
               </div>
             </div>
 
+            {/* Banking & Statutory Details Section */}
+            <div style={{ marginTop: '8px', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#0b3d2b', textTransform: 'uppercase', marginBottom: '10px' }}>
+                Payroll &amp; Statutory Credentials (Employee Kept)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.725rem' }}>Office Role / Designation</span>
+                  <strong style={{ color: '#0f172a' }}>{selectedEmp.designation || selectedEmp.role || 'Not Set'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.725rem' }}>Bank Name</span>
+                  <strong style={{ color: '#0f172a' }}>{selectedEmp.bank_name || selectedEmp.bankName || 'IDFC FIRST BANK (Default)'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.725rem' }}>Bank Account Number</span>
+                  <strong style={{ color: '#0f172a' }}>{selectedEmp.account_number || selectedEmp.accountNumber || '87387687323 (Default)'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.725rem' }}>PAN Card Number</span>
+                  <strong style={{ color: '#0f172a', letterSpacing: '0.5px' }}>{selectedEmp.pan_number || selectedEmp.panNumber || selectedEmp.pan || 'GF837FEYB73 (Default)'}</strong>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.725rem' }}>UAN (PF Number)</span>
+                  <strong style={{ color: '#0f172a', letterSpacing: '0.5px' }}>{selectedEmp.uan_number || selectedEmp.uanNumber || selectedEmp.uan || selectedEmp.pf_number || '27368873212 (Default)'}</strong>
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
               <button
                 type="button"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
 import BrandLogo from '../../components/common/BrandLogo';
 import { authService } from '../../services/authService';
 import '../../styles/auth.css';
@@ -87,6 +87,17 @@ export default function EmployeeLogin() {
 
         {/* Login Card */}
         <div className="auth-card">
+          {/* Subtle Small Admin Login at Top-Right Corner */}
+          <button
+            type="button"
+            onClick={() => navigate('/admin/login')}
+            className="admin-corner-btn"
+            title="Switch to Admin Portal"
+          >
+            <Shield size={11} color="#6941c6" />
+            <span>Admin</span>
+          </button>
+
           <h1 className="auth-card-title">Welcome Back</h1>
           <p className="auth-card-desc">Sign in to manage your attendance</p>
 
@@ -179,14 +190,6 @@ export default function EmployeeLogin() {
                 ) : (
                   'LOGIN'
                 )}
-              </button>
-
-              <button
-                type="button"
-                className="btn-secondary-gray"
-                onClick={() => navigate('/admin/login')}
-              >
-                ADMIN LOGIN
               </button>
 
               <button

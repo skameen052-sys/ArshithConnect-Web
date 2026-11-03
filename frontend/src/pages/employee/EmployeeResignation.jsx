@@ -94,7 +94,7 @@ export default function EmployeeResignation() {
   };
 
   return (
-    <div className="hrms-page-container">
+    <div className="hrms-page-container animate-fade-in" style={{ maxWidth: '100%', boxSizing: 'border-box', marginBottom: '36px' }}>
       {/* Header */}
       <div className="hrms-page-header">
         <div className="hrms-page-title-group">
@@ -266,8 +266,8 @@ export default function EmployeeResignation() {
         </div>
       ) : (
         /* Resignation Submission Form */
-        <div className="hrms-card" style={{ maxWidth: '720px' }}>
-          <div className="hrms-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="hrms-card" style={{ maxWidth: '720px', margin: '0 auto 36px auto', width: '100%', boxSizing: 'border-box' }}>
+          <div className="hrms-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <h2 className="hrms-card-title"><UserMinus size={20} /> Formal Resignation Submission</h2>
             {isReapplying && (
               <button
@@ -323,7 +323,7 @@ export default function EmployeeResignation() {
               </div>
             </div>
 
-            <div className="hrms-card-header" style={{ justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', borderBottom: 'none' }}>
+            <div className="hrms-card-header" style={{ justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', borderBottom: 'none', padding: '1rem 1.5rem', flexWrap: 'wrap', gap: '8px' }}>
               <button type="submit" className="hrms-btn-primary" disabled={submitting}>
                 <Send size={15} /> {submitting ? 'Submitting to HR...' : 'Submit Resignation'}
               </button>

@@ -100,7 +100,7 @@ export default function AdminLayout() {
 
         {/* Independently Scrollable Content Container */}
         <div className="dashboard-container admin-content">
-          <main className="admin-page-content">
+          <main className="admin-page-content animate-fade-in" key={location.pathname}>
             <Outlet />
           </main>
         </div>

@@ -74,43 +74,17 @@ export default function EmployeeNavbar({ onOpenDrawer }) {
 
       {/* Right: Chat, User Avatar & Logout Button matching Screenshot 4 */}
       <div className="portal-nav-right">
-        {/* Teams Chat Icon with Unread Badge */}
+        {/* Teams Chat Icon Button with Floating Unread Badge */}
         <button
           type="button"
           onClick={() => navigate('/employee/chat')}
-          style={{
-            position: 'relative',
-            background: 'transparent',
-            border: 'none',
-            padding: '7px 9px',
-            cursor: 'pointer',
-            color: '#1e293b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '8px',
-            transition: 'background-color 0.15s ease',
-          }}
-          className="navbar-chat-trigger"
-          title="Open Teams Chat & Channels"
+          className="navbar-team-chat-btn"
+          title={`Teams Chat${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+          aria-label="Teams Chat"
         >
-          <MessageSquare size={19} />
+          <MessageSquare size={18} />
           {unreadCount > 0 && (
-            <span
-              style={{
-                position: 'absolute',
-                top: '0px',
-                right: '0px',
-                backgroundColor: '#ef4444',
-                color: '#ffffff',
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                borderRadius: '10px',
-                padding: '1px 5px',
-                lineHeight: 1.2,
-                boxShadow: '0 0 0 2px #ffffff',
-              }}
-            >
+            <span className="navbar-chat-badge">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -122,8 +96,16 @@ export default function EmployeeNavbar({ onOpenDrawer }) {
           style={{ cursor: 'pointer' }}
           title={`${employeeName} (${employeeId}) - View Profile`}
         >
-          <div className="user-avatar" style={{ backgroundColor: '#0b3d2b' }}>
-            {employeeName.charAt(0).toUpperCase()}
+          <div className="user-avatar" style={{ backgroundColor: '#0b3d2b', overflow: 'hidden' }}>
+            {(storedUser?.profile_photo || storedUser?.profilePhoto) ? (
+              <img
+                src={storedUser.profile_photo || storedUser.profilePhoto}
+                alt={employeeName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              employeeName.charAt(0).toUpperCase()
+            )}
           </div>
         </div>
 

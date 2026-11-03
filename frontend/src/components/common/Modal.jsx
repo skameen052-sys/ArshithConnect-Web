@@ -37,11 +37,11 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, maxW
         padding: '16px',
         boxSizing: 'border-box',
         overflow: 'hidden',
-        animation: 'fadeIn 0.2s ease-out'
+        animation: 'modalBackdropIn 0.22s ease-out forwards'
       }}
     >
       <div
-        className="modal-content"
+        className="modal-content animate-modal-spring"
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#ffffff',
@@ -54,7 +54,6 @@ export default function Modal({ isOpen, onClose, title, subtitle, children, maxW
           flexDirection: 'column',
           overflow: 'hidden',
           boxSizing: 'border-box',
-          animation: 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
         role="dialog"
         aria-modal="true"

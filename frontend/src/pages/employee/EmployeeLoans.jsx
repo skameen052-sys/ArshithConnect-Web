@@ -105,7 +105,7 @@ export default function EmployeeLoans() {
   };
 
   return (
-    <div className="hrms-page-container">
+    <div className="hrms-page-container animate-fade-in" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
       <div className="hrms-page-header">
         <div className="hrms-page-title-group">
@@ -172,7 +172,7 @@ export default function EmployeeLoans() {
       </div>
 
       {/* Table */}
-      <div className="hrms-card">
+      <div className="hrms-card" style={{ marginBottom: '36px' }}>
         <div className="hrms-card-header">
           <h2 className="hrms-card-title"><CreditCard size={20} /> Loan Application History</h2>
         </div>

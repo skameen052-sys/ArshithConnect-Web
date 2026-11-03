@@ -19,10 +19,13 @@ export default function EmployeeLayout() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const location = useLocation();
 
-  // Auto-close drawer on route transition
+  // Auto-close drawer and reset scroll position to top on route transition
   useEffect(() => {
     setIsDrawerOpen(false);
-  }, [location.pathname]);
+    window.scrollTo(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [location.pathname, location.search, location.key]);
 
   return (
     <div className="employee-portal-wrapper">
@@ -41,7 +44,7 @@ export default function EmployeeLayout() {
         <EmployeeNavbar onOpenDrawer={() => setIsDrawerOpen(true)} />
 
         {/* Dynamic Page Content */}
-        <main className="employee-main-content">
+        <main className="employee-main-content animate-fade-in" key={location.pathname}>
           <Outlet />
         </main>
       </div>

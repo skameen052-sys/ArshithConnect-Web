@@ -12,6 +12,8 @@ from app.models.assignment import WorkAssignment
 from app.models.work_update import WorkUpdate
 from app.models.registration_request import RegistrationRequest
 from app.models.office_timing import OfficeTiming
+from app.models.payslip_request import PayslipRequest
+from app.models.work_schedule import WorkSchedule
 
 __all__ = [
     "Base",
@@ -27,6 +29,8 @@ __all__ = [
     "TeamMember",
     "WorkAssignment",
     "WorkUpdate",
+    "WorkSchedule",
     "RegistrationRequest",
     "OfficeTiming",
+    "PayslipRequest",
 ]

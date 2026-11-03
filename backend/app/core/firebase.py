@@ -4,14 +4,23 @@ import logging
 import urllib.request
 import urllib.error
 from typing import Optional, Any
-import firebase_admin
-from firebase_admin import credentials, firestore, storage, auth
+try:
+    import firebase_admin
+    from firebase_admin import credentials, firestore, storage, auth
+    HAS_FIREBASE_ADMIN = True
+except ImportError:
+    firebase_admin = None
+    credentials = None
+    firestore = None
+    storage = None
+    auth = None
+    HAS_FIREBASE_ADMIN = False
 
 from app.core.config import settings
 
 logger = logging.getLogger("uvicorn.error")
 
-_firebase_app: Optional[firebase_admin.App] = None
+_firebase_app: Optional[Any] = None
 _firestore_client: Optional[Any] = None
 _storage_bucket: Optional[Any] = None
 _init_attempted: bool = False
@@ -29,6 +38,11 @@ def init_firebase() -> bool:
         return _is_live
 
     _init_attempted = True
+
+    if not HAS_FIREBASE_ADMIN:
+        logger.info("[Firebase] Running in local store mode (firebase_admin module not installed).")
+        _is_live = False
+        return False
 
     cred = None
     cred_source = "None"

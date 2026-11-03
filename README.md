@@ -126,25 +126,59 @@ The database is seeded on startup with default test accounts:
 
 ## 🚀 Running the Project
 
-### 1. Web Frontend (`frontend/`)
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-- Local URL: `http://localhost:5173`
+### Prerequisites
+- **Node.js**: v18 or later (`node -v`)
+- **npm**: v9 or later (`npm -v`)
+- **Python**: v3.10+ (v3.12 or v3.13 recommended)
+- **Database**: Firebase Firestore (configured in `.env`) or local PostgreSQL 15+
 
-### 2. FastAPI Backend (`backend/`)
+---
+
+### 1. FastAPI Backend (`backend/`)
 ```powershell
 cd backend
+
+# Create and activate virtual environment
 python -m venv .venv
-.\venv\Scripts\Activate.ps1
+# On Windows:
+.\.venv\Scripts\Activate.ps1
+# On macOS / Linux:
+# source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Configure environment variables
+# Copy .env.example to .env and configure your Firebase / DB keys
+copy .env.example .env
+
+# Run database migrations (if using PostgreSQL)
 alembic upgrade head
+
+# Start API server
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 - API Base URL: `http://127.0.0.1:8000`
-- Interactive Swagger OpenAPI Docs: `http://127.0.0.1:8000/docs`
+- Interactive Swagger Docs: `http://127.0.0.1:8000/docs`
+- Health check: `http://127.0.0.1:8000/health`
+
+---
+
+### 2. Web Frontend (`frontend/`)
+```powershell
+cd frontend
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+# Copy .env.example to .env and verify VITE_API_BASE_URL=http://127.0.0.1:8000
+copy .env.example .env
+
+# Start Vite dev server
+npm run dev
+```
+- Web Application URL: `http://localhost:5173`
 
 ### 3. Android Application (`android/`)
 1. Open [`android/`](android/) in **Android Studio**.

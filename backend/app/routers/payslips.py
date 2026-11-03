@@ -144,6 +144,18 @@ def get_payslip(payslip_id: str, current_user: Any = Depends(get_current_user)):
                 payslip = p
                 break
 
+    # If payslip not found directly, check if payslip_id references a payslip_request
+    if not payslip:
+        req = FirestoreService.get_by_id("payslip_requests", str(payslip_id))
+        if not req:
+            for r in FirestoreService.get_all("payslip_requests"):
+                if str(r.get("id") or r.get("request_code")) == str(payslip_id):
+                    req = r
+                    break
+        if req:
+            from app.routers.payslip_requests import download_payslip_by_request
+            return download_payslip_by_request(str(req.get("id") or payslip_id), current_user)
+
     if not payslip:
         raise HTTPException(status_code=404, detail="Payslip record not found.")
 
@@ -174,6 +186,18 @@ def request_payslip_download(
             if str(p.get("id") or p.get("_firestore_id") or p.get("payslip_number")) == str(payslip_id):
                 payslip = p
                 break
+
+    # If payslip not found directly, check if payslip_id references a payslip_request
+    if not payslip:
+        req = FirestoreService.get_by_id("payslip_requests", str(payslip_id))
+        if not req:
+            for r in FirestoreService.get_all("payslip_requests"):
+                if str(r.get("id") or r.get("request_code")) == str(payslip_id):
+                    req = r
+                    break
+        if req:
+            from app.routers.payslip_requests import download_payslip_by_request
+            return download_payslip_by_request(str(req.get("id") or payslip_id), current_user)
 
     if not payslip:
         raise HTTPException(status_code=404, detail="Payslip record not found.")
@@ -233,6 +257,18 @@ def approve_payslip_download(
                 payslip = p
                 break
 
+    # If payslip not found directly, check if payslip_id references a payslip_request
+    if not payslip:
+        req = FirestoreService.get_by_id("payslip_requests", str(payslip_id))
+        if not req:
+            for r in FirestoreService.get_all("payslip_requests"):
+                if str(r.get("id") or r.get("request_code")) == str(payslip_id):
+                    req = r
+                    break
+        if req:
+            from app.routers.payslip_requests import download_payslip_by_request
+            return download_payslip_by_request(str(req.get("id") or payslip_id), current_user)
+
     if not payslip:
         raise HTTPException(status_code=404, detail="Payslip record not found.")
 
@@ -276,6 +312,18 @@ def reject_payslip_download(
                 payslip = p
                 break
 
+    # If payslip not found directly, check if payslip_id references a payslip_request
+    if not payslip:
+        req = FirestoreService.get_by_id("payslip_requests", str(payslip_id))
+        if not req:
+            for r in FirestoreService.get_all("payslip_requests"):
+                if str(r.get("id") or r.get("request_code")) == str(payslip_id):
+                    req = r
+                    break
+        if req:
+            from app.routers.payslip_requests import download_payslip_by_request
+            return download_payslip_by_request(str(req.get("id") or payslip_id), current_user)
+
     if not payslip:
         raise HTTPException(status_code=404, detail="Payslip record not found.")
 
@@ -317,6 +365,18 @@ def download_payslip_pdf(payslip_id: str, current_user: Any = Depends(get_curren
                 payslip = p
                 break
 
+    # If payslip not found directly, check if payslip_id references a payslip_request
+    if not payslip:
+        req = FirestoreService.get_by_id("payslip_requests", str(payslip_id))
+        if not req:
+            for r in FirestoreService.get_all("payslip_requests"):
+                if str(r.get("id") or r.get("request_code")) == str(payslip_id):
+                    req = r
+                    break
+        if req:
+            from app.routers.payslip_requests import download_payslip_by_request
+            return download_payslip_by_request(str(req.get("id") or payslip_id), current_user)
+
     if not payslip:
         raise HTTPException(status_code=404, detail="Payslip record not found.")
 
@@ -344,6 +404,40 @@ def download_payslip_pdf(payslip_id: str, current_user: Any = Depends(get_curren
     detail = payslip.get("detail", payslip)
     # Merge top-level payslip properties into detail for complete template population
     merged_detail = {**payslip, **detail}
+
+    # Dynamic personal & banking data overlay from the authoritative employee profile
+    emp_lookup_id = payslip.get("employee_doc_id") or payslip.get("employee_id") or payslip.get("employeeId")
+    emp_email = payslip.get("employee_email") or payslip.get("email")
+    emp_rec = None
+    if emp_lookup_id:
+        emp_rec = FirestoreService.get_by_id("employees", str(emp_lookup_id))
+    if not emp_rec and payslip.get("employee_id"):
+        emp_rec = FirestoreService.get_by_id("employees", str(payslip.get("employee_id")))
+    if not emp_rec and payslip.get("employeeId"):
+        matches = FirestoreService.query("employees", {"employee_id": str(payslip.get("employeeId"))})
+        if matches:
+            emp_rec = matches[0]
+    if not emp_rec and emp_email:
+        matches = FirestoreService.query("employees", {"email": str(emp_email).lower().strip()})
+        if matches:
+            emp_rec = matches[0]
+
+    if emp_rec:
+        b_name = emp_rec.get("bank_name") or emp_rec.get("bankName")
+        if b_name:
+            merged_detail["bank_name"] = b_name
+        b_acct = emp_rec.get("account_number") or emp_rec.get("accountNumber") or emp_rec.get("bank_account_no")
+        if b_acct:
+            merged_detail["account_number"] = b_acct
+        pan = emp_rec.get("pan_number") or emp_rec.get("panNumber") or emp_rec.get("pan")
+        if pan:
+            merged_detail["pan_number"] = pan
+        uan = emp_rec.get("uan_number") or emp_rec.get("uanNumber") or emp_rec.get("uan") or emp_rec.get("pf_number")
+        if uan:
+            merged_detail["uan_number"] = uan
+        desig = emp_rec.get("designation") or emp_rec.get("role")
+        if desig:
+            merged_detail["designation"] = desig
 
     run_info = {
         "month": payslip.get("month", 8),

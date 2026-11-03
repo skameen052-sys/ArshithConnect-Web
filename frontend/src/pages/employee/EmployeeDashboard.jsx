@@ -22,6 +22,7 @@ import {
   XCircle,
   CreditCard,
   Download,
+  Landmark,
 } from 'lucide-react';
 import AttendanceCard from '../../components/employee/AttendanceCard';
 import QuickActionCard from '../../components/employee/QuickActionCard';
@@ -540,6 +541,13 @@ export default function EmployeeDashboard() {
         </div>
 
         <div className="quick-actions-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
+          <QuickActionCard
+            title="Personal & Banking"
+            icon={Landmark}
+            iconBg="#eff6ff"
+            iconColor="#2563eb"
+            onClick={() => navigate('/employee/profile')}
+          />
           <QuickActionCard
             title="My Payslips"
             icon={Receipt}

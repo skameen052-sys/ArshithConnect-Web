@@ -143,7 +143,7 @@ export default function AdminSidebar({ onClose }) {
                   {item.isChat && unreadCount > 0 && (
                     <span
                       style={{
-                        backgroundColor: '#ef4444',
+                        backgroundColor: '#F04491',
                         color: '#ffffff',
                         fontSize: '0.7rem',
                         fontWeight: 700,

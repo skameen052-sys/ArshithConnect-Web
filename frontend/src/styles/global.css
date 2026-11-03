@@ -138,3 +138,68 @@ button {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Navbar Team Chat Icon Button (Matches ArshithConnect Chat Theme) */
+.navbar-team-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  background-color: #F0E9FF;
+  color: #713DE5;
+  border: 1.5px solid #E9E1F5;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  text-decoration: none;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.navbar-team-chat-btn:hover {
+  background: linear-gradient(135deg, #6739E8 0%, #A43CE0 100%);
+  color: #ffffff;
+  border-color: #713DE5;
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 4px 12px rgba(113, 61, 229, 0.3);
+}
+
+.navbar-team-chat-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.navbar-team-chat-btn .navbar-chat-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #F04491;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  border-radius: 999px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 0 2px #ffffff;
+  pointer-events: none;
+  animation: badge-pulse 2s infinite ease-in-out;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+

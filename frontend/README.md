@@ -6,13 +6,17 @@ Refer to the master [README.md](../README.md) in the project root for complete s
 
 ### Quick Start
 ```bash
-# Install dependencies
+# 1. Install dependencies
 npm install
 
-# Start development server
+# 2. Configure environment
+# Copy .env.example to .env and ensure VITE_API_BASE_URL points to the backend (e.g. http://127.0.0.1:8000)
+cp .env.example .env
+
+# 3. Start development server
 npm run dev
 
-# Run production build
+# 4. Run production build
 npm run build
 ```
 

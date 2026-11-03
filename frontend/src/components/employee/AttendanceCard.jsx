@@ -6,6 +6,7 @@ import { authService } from '../../services/authService';
 import AttendanceCheckInModal from './AttendanceCheckInModal';
 import AttendancePhotoDisplay from './AttendancePhotoDisplay';
 import LateCheckInModal from './LateCheckInModal';
+import AttendanceCelebrationModal from './AttendanceCelebrationModal';
 
 export default function AttendanceCard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -45,6 +46,11 @@ export default function AttendanceCard() {
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState(false);
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
+  const [celebrationState, setCelebrationState] = useState({
+    isOpen: false,
+    type: 'check-in',
+    data: {},
+  });
   const [toastMessage, setToastMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
@@ -231,6 +237,17 @@ export default function AttendanceCard() {
     setToastMessage(`Checked In (${res.workMode || workMode}) - Status: ${res.status || 'Present'}`);
     setTimeout(() => setToastMessage(''), 4000);
 
+    // Trigger celebratory Check-In Animation
+    setCelebrationState({
+      isOpen: true,
+      type: 'check-in',
+      data: {
+        checkInTime: res.checkIn || res.checkInTime || 'Just now',
+        workMode: res.workMode || workMode,
+        status: res.status || 'Present',
+      },
+    });
+
     // If check-in is after 9:30 AM IST (late), prompt the user with Late Check-in Reason modal immediately
     if (isRecordLate && !res.lateReason) {
       setTimeout(() => {
@@ -263,6 +280,17 @@ export default function AttendanceCard() {
 
       setToastMessage(`Checked Out successfully at ${res.checkOut || res.checkOutTime || 'now'}`);
       setTimeout(() => setToastMessage(''), 4500);
+
+      // Trigger celebratory Check-Out Animation
+      setCelebrationState({
+        isOpen: true,
+        type: 'check-out',
+        data: {
+          checkOutTime: res.checkOut || res.checkOutTime || 'Just now',
+          workingDuration: res.duration || res.workingDuration || workingDuration,
+          status: 'Completed',
+        },
+      });
     } catch (err) {
       setIsError(true);
       setToastMessage(err.message || 'Check-out failed');
@@ -310,7 +338,7 @@ export default function AttendanceCard() {
       <div className="attendance-card-header">
         <span className="attendance-date">{formattedDate}</span>
         <div className={`status-badge-pill ${badgeClass}`}>
-          <span className="badge-dot" />
+          <span className={`badge-dot ${isCheckedIn ? 'badge-beacon-green' : isCompleted ? 'badge-beacon-blue' : ''}`} />
           <span>{badgeLabel}</span>
         </div>
       </div>
@@ -490,7 +518,7 @@ export default function AttendanceCard() {
           type="button"
           id="btn-attendance-check-in"
           className={`btn-check-in ${
-            !isCheckedIn && !isCompleted ? 'btn-check-in-active' : 'btn-check-in-disabled'
+            !isCheckedIn && !isCompleted ? 'btn-check-in-active btn-shimmer' : 'btn-check-in-disabled'
           }`}
           onClick={handleCheckInClick}
           disabled={isCheckedIn || isCompleted}
@@ -509,7 +537,7 @@ export default function AttendanceCard() {
           id="btn-attendance-check-out"
           className={`btn-check-out ${
             isCheckedIn && !isCompleted
-              ? 'btn-check-out-active'
+              ? 'btn-check-out-active btn-shimmer'
               : isCompleted
               ? 'btn-check-out-completed'
               : 'btn-check-out-disabled'
@@ -766,6 +794,14 @@ export default function AttendanceCard() {
           setToastMessage('Late check-in reason recorded successfully');
           setTimeout(() => setToastMessage(''), 4500);
         }}
+      />
+
+      {/* Check-In & Check-Out Celebration Animation Modal */}
+      <AttendanceCelebrationModal
+        isOpen={celebrationState.isOpen}
+        type={celebrationState.type}
+        data={celebrationState.data}
+        onClose={() => setCelebrationState((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

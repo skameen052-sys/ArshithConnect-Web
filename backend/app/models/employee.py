@@ -1,6 +1,6 @@
 from datetime import datetime, date, timezone
 from typing import Optional, List
-from sqlalchemy import Integer, String, Float, Date, DateTime, ForeignKey, Index, text
+from sqlalchemy import Integer, String, Float, Date, DateTime, ForeignKey, Index, text, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -31,6 +31,11 @@ class Employee(Base):
     shift: Mapped[str] = mapped_column(String(100), default="General (09:00 AM - 06:00 PM)", nullable=False)
     location: Mapped[str] = mapped_column(String(100), default="HQ Office", nullable=False)
     attendance_percentage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bank_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True, default=None)
+    account_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default=None)
+    pan_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
+    uan_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
+    profile_photo: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

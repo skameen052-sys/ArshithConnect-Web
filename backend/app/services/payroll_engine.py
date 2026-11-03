@@ -331,10 +331,18 @@ class PayrollEngine:
 
         # Fetch employees
         all_employees = FirestoreService.get_all("employees")
-        active_employees = [
-            e for e in all_employees
-            if str(e.get("status", "Active")).lower() in ["active", "probation", "confirmed"]
-        ]
+        seen_keys = set()
+        active_employees = []
+        for e in all_employees:
+            if str(e.get("status", "Active")).lower() not in ["active", "approved", "probation", "confirmed"]:
+                continue
+            email_key = str(e.get("email") or "").strip().lower()
+            emp_code_key = str(e.get("employee_id") or e.get("employeeId") or "").strip().upper()
+            dedup_key = email_key or emp_code_key or str(e.get("id"))
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+            active_employees.append(e)
 
         if not active_employees:
             raise ValueError("No active employees found to process payroll.")
@@ -429,10 +437,10 @@ class PayrollEngine:
                 "date_of_joining": str(emp.get("date_of_joining") or emp.get("joining_date") or emp.get("created_at", "16-Jan-2025")[:10]),
                 "location": str(emp.get("location") or "Bangalore"),
                 "gender": str(emp.get("gender") or "Male"),
-                "bank_name": emp.get("bank_name", "IDFC FIRST BANK"),
-                "account_number": emp.get("account_number", "87387687323"),
-                "pan_number": emp.get("pan_number", "GF837FEYB73"),
-                "uan_number": emp.get("uan_number", "27368873212"),
+                "bank_name": emp.get("bank_name") or emp.get("bankName") or "—",
+                "account_number": emp.get("account_number") or emp.get("accountNumber") or emp.get("bank_account_no") or "—",
+                "pan_number": emp.get("pan_number") or emp.get("panNumber") or emp.get("pan") or "—",
+                "uan_number": emp.get("uan_number") or emp.get("uanNumber") or emp.get("uan") or emp.get("pf_number") or "—",
                 "loan_id": loan_info.get("id") if loan_info else None,
                 "sundays": att_breakdown.get("sundays", 4),
                 "holidays": att_breakdown.get("holidays", 0),

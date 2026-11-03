@@ -1,6 +1,9 @@
 import api from './api';
 
 export const payslipService = {
+  // =========================================================================
+  // Payslip Directory & Records
+  // =========================================================================
   getPayslips: async () => {
     const response = await api.get('/api/payslips');
     return response.data;
@@ -11,9 +14,70 @@ export const payslipService = {
     return response.data;
   },
 
+  // =========================================================================
+  // Official Payslip Download Request Module (User Spec)
+  // =========================================================================
+
   /**
-   * Employee raises a request to Admin to unlock / approve PDF payslip download
+   * Submit an official payslip download request (Employee Portal)
    */
+  submitRequest: async ({ month, year, reason, additional_details }) => {
+    const response = await api.post('/api/payslip-requests', {
+      month: parseInt(month, 10),
+      year: parseInt(year, 10),
+      reason,
+      additional_details: additional_details || '',
+    });
+    return response.data;
+  },
+
+  /**
+   * Retrieve personal payslip request history with live status (Employee Portal)
+   */
+  getMyRequests: async () => {
+    const response = await api.get('/api/payslip-requests/my-requests');
+    return response.data;
+  },
+
+  /**
+   * Retrieve all employee payslip requests with search, filter, and KPI metrics (Admin Portal)
+   */
+  getAdminRequests: async (params = {}) => {
+    const response = await api.get('/api/admin/payslip-requests', { params });
+    return response.data;
+  },
+
+  /**
+   * Get single request details for review (Admin Portal)
+   */
+  getAdminRequestById: async (id) => {
+    const response = await api.get(`/api/admin/payslip-requests/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Admin approves an employee's payslip download request
+   */
+  approveRequest: async (id, notes = '') => {
+    const response = await api.patch(`/api/admin/payslip-requests/${id}/approve`, {
+      notes,
+    });
+    return response.data;
+  },
+
+  /**
+   * Admin rejects an employee's payslip download request with mandatory reason
+   */
+  rejectRequest: async (id, rejection_reason = '') => {
+    const response = await api.patch(`/api/admin/payslip-requests/${id}/reject`, {
+      rejection_reason,
+    });
+    return response.data;
+  },
+
+  // =========================================================================
+  // Legacy Unlock Methods (Preserved for compatibility)
+  // =========================================================================
   requestDownload: async (id, reason = '') => {
     const response = await api.post(`/api/payslips/${id}/request-download`, {
       reason,
@@ -21,17 +85,11 @@ export const payslipService = {
     return response.data;
   },
 
-  /**
-   * Admin retrieves all employee payslip download unlock requests
-   */
   getDownloadRequests: async () => {
     const response = await api.get('/api/payslips/requests/list');
     return response.data;
   },
 
-  /**
-   * Admin approves an employee's payslip download request
-   */
   approveDownload: async (id, notes = '') => {
     const response = await api.post(`/api/payslips/${id}/approve-download`, {
       notes,
@@ -39,9 +97,6 @@ export const payslipService = {
     return response.data;
   },
 
-  /**
-   * Admin rejects an employee's payslip download request
-   */
   rejectDownload: async (id, reason = '') => {
     const response = await api.post(`/api/payslips/${id}/reject-download`, {
       reason,
@@ -49,18 +104,24 @@ export const payslipService = {
     return response.data;
   },
 
+  // =========================================================================
+  // High-Security PDF Streaming & Browser Download
+  // =========================================================================
   downloadPayslipPdf: async (id, fallbackName = 'Payslip.pdf') => {
-    const response = await api.get(`/api/payslips/${id}/download`, {
+    // Try payslip-requests download first, fallback to payslips download
+    const endpoint = String(id).startsWith('REQ-') || String(id).startsWith('PSR-')
+      ? `/api/payslip-requests/${id}/download`
+      : `/api/payslips/${id}/download`;
+
+    const response = await api.get(endpoint, {
       responseType: 'blob',
     });
 
-    // Create a temporary anchor element to trigger download in browser
     const blob = new Blob([response.data], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
 
-    // Extract filename from header if present
     const disposition = response.headers['content-disposition'];
     let filename = fallbackName;
     if (disposition && disposition.indexOf('filename=') !== -1) {

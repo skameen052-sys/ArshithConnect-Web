@@ -13,8 +13,6 @@ import {
   Reply,
   Edit2,
   Info,
-  Phone,
-  Video,
   CheckCheck,
   X,
   Hash,
@@ -27,6 +25,12 @@ import {
   Loader2,
   Image as ImageIcon,
   Check,
+  Mic,
+  Volume2,
+  Square,
+  Bell,
+  BellOff,
+  MoreVertical,
 } from 'lucide-react';
 import { chatService } from '../../services/chatService';
 import '../../styles/teamsChat.css';
@@ -87,13 +91,42 @@ export default function TeamsChatWorkspace() {
   const isAdmin = userRole.toLowerCase() === 'admin';
   const myPrimaryId = currentUser.employeeId || currentUser.employee_id || currentUser.id || (isAdmin ? 'ADM-001' : 'employee');
 
+  const myKeys = [
+    currentUser.employeeId,
+    currentUser.employee_id,
+    currentUser.id,
+    currentUser.email,
+    isAdmin ? 'adm-001' : null,
+    isAdmin ? 'admin' : null,
+    isAdmin ? 'administrator' : null,
+    isAdmin ? 'admin@arshith.com' : null,
+    myPrimaryId,
+  ].filter(Boolean).map((k) => String(k).trim().toLowerCase());
+
+  const getCanonicalId = (id) => {
+    if (!id) return '';
+    const clean = String(id).trim();
+    const l = clean.toLowerCase();
+    if (l === 'adm-001' || l === 'admin' || l === 'administrator' || l === 'admin@arshith.com') {
+      return 'ADM-001';
+    }
+    return clean.toUpperCase();
+  };
+
   // Data states
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
+  const activeConversationRef = useRef(activeConversation);
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
+  const currentRequestIdRef = useRef(0);
+
   const [messages, setMessages] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [teams, setTeams] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
   // UI & Filter states
@@ -104,6 +137,8 @@ export default function TeamsChatWorkspace() {
   const [editingMessage, setEditingMessage] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [detailsTab, setDetailsTab] = useState('members'); // 'members', 'files', 'pinned'
+  const [isMuted, setIsMuted] = useState(false);
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
 
@@ -123,6 +158,14 @@ export default function TeamsChatWorkspace() {
   // Add member dropdown state
   const [showAddMemberSelect, setShowAddMemberSelect] = useState(false);
   const [selectedAddMemberId, setSelectedAddMemberId] = useState('');
+
+  // Voice message recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isSendingVoice, setIsSendingVoice] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -146,37 +189,87 @@ export default function TeamsChatWorkspace() {
         chatService.getTeams(),
       ]);
 
-      const convList = Array.isArray(convsData) ? convsData : [];
+      const rawConvList = Array.isArray(convsData) ? convsData : [];
+      const contactsList = Array.isArray(contactsData) ? contactsData : [];
+
+      // Helper to find matching contact for direct conversations
+      const matchContact = (targetId, title) => {
+        const tId = String(targetId || '').trim().toLowerCase();
+        const tName = String(title || '').trim().toLowerCase();
+        return contactsList.find((ct) => {
+          const ctId = String(ct.id || '').trim().toLowerCase();
+          const ctEmpId = String(ct.employee_id || '').trim().toLowerCase();
+          const ctEmail = String(ct.email || '').trim().toLowerCase();
+          const ctName = String(ct.name || '').trim().toLowerCase();
+          return (
+            (ctId && (ctId === tId || ctId === tName)) ||
+            (ctEmpId && (ctEmpId === tId || ctEmpId === tName)) ||
+            (ctEmail && (ctEmail === tId || ctEmail === tName)) ||
+            (ctName && (ctName === tId || ctName === tName))
+          );
+        });
+      };
+
+      // Enrich conversations with actual contact profile details
+      const convList = rawConvList.map((c) => {
+        if (c.type === 'direct') {
+          const matched = matchContact(c.target_id, c.title);
+          if (matched) {
+            return {
+              ...c,
+              title: matched.name || c.title,
+              subtitle: matched.designation
+                ? `${matched.designation} • ${matched.department || 'Operations'}`
+                : c.subtitle,
+              profile_photo: matched.profile_photo || matched.photo_url || c.profile_photo || c.photo_url || null,
+              photo_url: matched.photo_url || matched.profile_photo || c.photo_url || c.profile_photo || null,
+              avatar: matched.name ? matched.name.charAt(0).toUpperCase() : c.avatar,
+            };
+          }
+        }
+        return c;
+      });
+
       setConversations(convList);
-      setContacts(Array.isArray(contactsData) ? contactsData : []);
+      setContacts(contactsList);
       setTeams(Array.isArray(teamsData) ? teamsData : []);
 
-      // Determine initial active conversation
+      // Determine initial active conversation or preserve currently selected
       let selected = null;
-      if (queryTeam) {
-        selected = convList.find(
-          (c) => c.type === 'team' && (c.target_id === queryTeam || c.title.toLowerCase() === queryTeam.toLowerCase())
-        );
-      } else if (queryUser) {
-        selected = convList.find(
-          (c) => c.type === 'direct' && c.target_id.toLowerCase() === queryUser.toLowerCase()
-        );
-        if (!selected) {
-          const foundContact = (contactsData || []).find(
-            (ct) => ct.id === queryUser || ct.employee_id === queryUser || ct.email === queryUser
+      const currentActiveId = activeConversationRef.current?.conversation_id;
+      if (currentActiveId) {
+        selected = convList.find((c) => c.conversation_id === currentActiveId) || null;
+      }
+
+      if (!selected) {
+        if (queryTeam) {
+          selected = convList.find(
+            (c) => c.type === 'team' && (c.target_id === queryTeam || c.title.toLowerCase() === queryTeam.toLowerCase())
           );
-          if (foundContact) {
-            selected = {
-              conversation_id: `direct_${foundContact.id}`,
-              type: 'direct',
-              target_id: foundContact.id,
-              title: foundContact.name,
-              subtitle: `${foundContact.designation || 'Staff'} • ${foundContact.department || 'Operations'}`,
-              avatar: foundContact.avatar || 'U',
-              is_online: foundContact.is_online,
-              last_message: '',
-              unread_count: 0,
-            };
+        } else if (queryUser) {
+          selected = convList.find(
+            (c) => c.type === 'direct' && c.target_id.toLowerCase() === queryUser.toLowerCase()
+          );
+          if (!selected) {
+            const foundContact = matchContact(queryUser, queryUser);
+            if (foundContact) {
+              const myCanonical = getCanonicalId(myPrimaryId);
+              const targetCanonical = getCanonicalId(foundContact.employee_id || foundContact.id);
+              const pair = [myCanonical, targetCanonical].sort();
+              selected = {
+                conversation_id: `dm_${pair[0]}_${pair[1]}`,
+                type: 'direct',
+                target_id: foundContact.employee_id || foundContact.id,
+                title: foundContact.name,
+                subtitle: `${foundContact.designation || 'Staff'} • ${foundContact.department || 'Operations'}`,
+                avatar: foundContact.name ? foundContact.name.charAt(0).toUpperCase() : (foundContact.avatar || 'U'),
+                profile_photo: foundContact.profile_photo || foundContact.photo_url || null,
+                photo_url: foundContact.photo_url || foundContact.profile_photo || null,
+                is_online: foundContact.is_online,
+                last_message: '',
+                unread_count: 0,
+              };
+            }
           }
         }
       }
@@ -185,26 +278,59 @@ export default function TeamsChatWorkspace() {
       if (!selected && convList.length > 0) {
         selected = convList[0];
       }
-      setActiveConversation(selected);
+
+      if (selected) {
+        if (selected.type === 'direct') {
+          const matched = matchContact(selected.target_id, selected.title);
+          if (matched) {
+            selected = {
+              ...selected,
+              title: matched.name || selected.title,
+              profile_photo: matched.profile_photo || matched.photo_url || selected.profile_photo || selected.photo_url || null,
+              photo_url: matched.photo_url || matched.profile_photo || selected.photo_url || selected.profile_photo || null,
+              avatar: matched.name ? matched.name.charAt(0).toUpperCase() : selected.avatar,
+            };
+          }
+        }
+        setActiveConversation(selected);
+      }
     } catch (err) {
       console.error('Failed to load chat data:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [queryTeam, queryUser]);
+  }, [queryTeam, queryUser, myPrimaryId]);
 
   // Load messages for currently active conversation
-  const loadMessages = useCallback(async (conv) => {
-    if (!conv) return;
+  const loadMessages = useCallback(async (conv, reqId) => {
+    if (!conv) {
+      setMessages([]);
+      setIsMessagesLoading(false);
+      return;
+    }
     try {
-      const msgs = await chatService.getMessages(conv.type, conv.target_id);
-      setMessages(msgs || []);
+      setIsMessagesLoading(true);
+      const msgs = await chatService.getMessages(conv.type, conv.target_id, 60, conv.conversation_id);
+      if (reqId !== currentRequestIdRef.current || activeConversationRef.current?.conversation_id !== conv.conversation_id) {
+        return;
+      }
+      setMessages(Array.isArray(msgs) ? msgs : []);
+      // Mark unread as read
+      chatService.markRead(conv.type, conv.target_id, conv.conversation_id).catch(() => {});
       // Clear unread badge locally
       setConversations((prev) =>
         prev.map((c) => (c.conversation_id === conv.conversation_id ? { ...c, unread_count: 0 } : c))
       );
     } catch (err) {
       console.error('Failed to load messages:', err);
+      if (reqId === currentRequestIdRef.current) {
+        setMessages([]);
+      }
+    } finally {
+      if (reqId === currentRequestIdRef.current) {
+        setIsMessagesLoading(false);
+        setTimeout(() => scrollToBottom(false), 80);
+      }
     }
   }, []);
 
@@ -216,11 +342,20 @@ export default function TeamsChatWorkspace() {
   // When active conversation changes, fetch its messages
   useEffect(() => {
     if (activeConversation) {
-      loadMessages(activeConversation);
+      if (activeConversation.type !== 'team') {
+        setIsDetailsOpen(false);
+      }
+      setMessages([]);
       setEditingMessage(null);
       setReplyingTo(null);
       setAttachedFile(null);
-      setTimeout(() => scrollToBottom(false), 80);
+      currentRequestIdRef.current += 1;
+      const reqId = currentRequestIdRef.current;
+      loadMessages(activeConversation, reqId);
+    } else {
+      setMessages([]);
+      setIsMessagesLoading(false);
+      setIsDetailsOpen(false);
     }
   }, [activeConversation, loadMessages]);
 
@@ -229,21 +364,23 @@ export default function TeamsChatWorkspace() {
     const handleWsEvent = (event) => {
       if (event.type === 'new_message' && event.message) {
         const msg = event.message;
-        // Check if message belongs to currently open conversation
-        if (activeConversation) {
-          const isCurrentTeam =
-            activeConversation.type === 'team' &&
-            msg.chat_type === 'team' &&
-            (msg.team_id === activeConversation.target_id ||
-              msg.target_id === activeConversation.target_id ||
-              (activeConversation.title && msg.team_name && activeConversation.title.toLowerCase() === msg.team_name.toLowerCase()));
-          const isCurrentDirect =
-            activeConversation.type === 'direct' &&
-            msg.chat_type === 'direct' &&
-            (msg.sender_id.toLowerCase() === activeConversation.target_id.toLowerCase() ||
-              msg.receiver_id.toLowerCase() === activeConversation.target_id.toLowerCase());
+        const currentConv = activeConversationRef.current;
 
-          if (isCurrentTeam || isCurrentDirect) {
+        // Check if message belongs strictly to currently open conversation
+        if (currentConv) {
+          const isCurrentConv = msg.conversation_id
+            ? msg.conversation_id === currentConv.conversation_id
+            : (currentConv.type === 'team' && msg.chat_type === 'team' && (
+                msg.team_id === currentConv.target_id ||
+                msg.target_id === currentConv.target_id ||
+                (currentConv.title && msg.team_name && currentConv.title.toLowerCase() === msg.team_name.toLowerCase())
+              )) ||
+              (currentConv.type === 'direct' && msg.chat_type === 'direct' && (
+                (myKeys.includes(String(msg.sender_id).toLowerCase()) && String(currentConv.target_id).toLowerCase() === String(msg.receiver_id).toLowerCase()) ||
+                (myKeys.includes(String(msg.receiver_id).toLowerCase()) && String(currentConv.target_id).toLowerCase() === String(msg.sender_id).toLowerCase())
+              ));
+
+          if (isCurrentConv) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg.id)) return prev;
               return [...prev, msg];
@@ -252,25 +389,27 @@ export default function TeamsChatWorkspace() {
           }
         }
 
-        // Update conversation preview snippet
+        // Update conversation preview snippet strictly for matching conversation
         setConversations((prev) =>
           prev.map((c) => {
-            const matches =
-              (c.type === 'team' &&
-                msg.chat_type === 'team' &&
-                (c.target_id === (msg.team_id || msg.target_id) ||
-                  (c.title && msg.team_name && c.title.toLowerCase() === msg.team_name.toLowerCase()))) ||
-              (c.type === 'direct' &&
-                msg.chat_type === 'direct' &&
-                (c.target_id.toLowerCase() === msg.sender_id.toLowerCase() ||
-                  c.target_id.toLowerCase() === msg.receiver_id.toLowerCase()));
+            const matches = msg.conversation_id
+              ? c.conversation_id === msg.conversation_id
+              : (c.type === 'team' &&
+                  msg.chat_type === 'team' &&
+                  (c.target_id === (msg.team_id || msg.target_id) ||
+                    (c.title && msg.team_name && c.title.toLowerCase() === msg.team_name.toLowerCase()))) ||
+                (c.type === 'direct' &&
+                  msg.chat_type === 'direct' &&
+                  ((myKeys.includes(String(msg.sender_id).toLowerCase()) && String(c.target_id).toLowerCase() === String(msg.receiver_id).toLowerCase()) ||
+                   (myKeys.includes(String(msg.receiver_id).toLowerCase()) && String(c.target_id).toLowerCase() === String(msg.sender_id).toLowerCase())));
             if (matches) {
+              const isActive = activeConversationRef.current?.conversation_id === c.conversation_id;
               return {
                 ...c,
                 last_message: msg.content || (msg.attachments?.length ? 'Shared an attachment' : ''),
                 last_message_sender: msg.sender_name,
                 last_message_at: msg.created_at,
-                unread_count: activeConversation?.target_id === c.target_id ? 0 : c.unread_count + 1,
+                unread_count: isActive ? 0 : (c.unread_count || 0) + 1,
               };
             }
             return c;
@@ -297,8 +436,72 @@ export default function TeamsChatWorkspace() {
       } else if (event.type === 'new_team' && event.team) {
         setTeams((prev) => [event.team, ...prev]);
         loadInitialData();
+      } else if (event.type === 'user_profile_updated') {
+        const { user_id, employee_id, photo_url, profile_photo, name } = event;
+        const photo = profile_photo || photo_url;
+        const matchesUser = (item) => {
+          if (!item) return false;
+          const target = String(item.target_id || '').trim().toLowerCase();
+          const title = String(item.title || '').trim().toLowerCase();
+          const uId = String(user_id || '').trim().toLowerCase();
+          const eId = String(employee_id || '').trim().toLowerCase();
+          const n = String(name || '').trim().toLowerCase();
+          return (
+            (uId && (target === uId || title === uId)) ||
+            (eId && (target === eId || title === eId)) ||
+            (n && (target === n || title === n))
+          );
+        };
+
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (c.type === 'direct' && matchesUser(c)) {
+              return {
+                ...c,
+                title: name || c.title,
+                profile_photo: photo !== undefined ? photo : c.profile_photo,
+                photo_url: photo !== undefined ? photo : c.photo_url,
+                avatar: name ? name.charAt(0).toUpperCase() : c.avatar,
+              };
+            }
+            return c;
+          })
+        );
+
+        setActiveConversation((prev) => {
+          if (prev && prev.type === 'direct' && matchesUser(prev)) {
+            return {
+              ...prev,
+              title: name || prev.title,
+              profile_photo: photo !== undefined ? photo : prev.profile_photo,
+              photo_url: photo !== undefined ? photo : prev.photo_url,
+              avatar: name ? name.charAt(0).toUpperCase() : prev.avatar,
+            };
+          }
+          return prev;
+        });
+
+        setContacts((prev) =>
+          prev.map((ct) => {
+            const ctId = String(ct.id || '').trim().toLowerCase();
+            const ctEmpId = String(ct.employee_id || '').trim().toLowerCase();
+            const uId = String(user_id || '').trim().toLowerCase();
+            const eId = String(employee_id || '').trim().toLowerCase();
+            if ((uId && ctId === uId) || (eId && ctEmpId === eId)) {
+              return {
+                ...ct,
+                name: name || ct.name,
+                profile_photo: photo !== undefined ? photo : ct.profile_photo,
+                photo_url: photo !== undefined ? photo : ct.photo_url,
+                avatar: name ? name.charAt(0).toUpperCase() : ct.avatar,
+              };
+            }
+            return ct;
+          })
+        );
       } else if (event.type === 'typing') {
-        if (activeConversation && event.target_id === activeConversation.target_id.toLowerCase()) {
+        const currentConv = activeConversationRef.current;
+        if (currentConv && event.target_id === currentConv.target_id.toLowerCase()) {
           setTypingUsers((prev) => ({
             ...prev,
             [event.sender_name]: event.is_typing,
@@ -320,10 +523,14 @@ export default function TeamsChatWorkspace() {
 
     // Light polling interval (every 4 seconds) to ensure synchronization
     const pollInterval = setInterval(() => {
-      if (activeConversation) {
+      const currentConv = activeConversationRef.current;
+      if (currentConv) {
         chatService
-          .getMessages(activeConversation.type, activeConversation.target_id)
+          .getMessages(currentConv.type, currentConv.target_id, 60, currentConv.conversation_id)
           .then((fresh) => {
+            if (activeConversationRef.current?.conversation_id !== currentConv.conversation_id) {
+              return;
+            }
             if (Array.isArray(fresh)) {
               setMessages((prev) => {
                 if (
@@ -345,7 +552,16 @@ export default function TeamsChatWorkspace() {
       cleanupWs();
       clearInterval(pollInterval);
     };
-  }, [activeConversation, loadInitialData]);
+  }, [loadInitialData]);
+
+  // Re-sync chat data when tab or window gains focus to reflect updated profiles
+  useEffect(() => {
+    const handleFocus = () => {
+      loadInitialData();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadInitialData]);
 
   // Handle typing notification
   const handleInputChange = (e) => {
@@ -397,6 +613,138 @@ export default function TeamsChatWorkspace() {
     setInputMessage('');
   };
 
+  // Start voice recording from microphone
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Voice recording is not supported in this browser.');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start(200);
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Error starting audio recording:', err);
+      alert('Microphone permission is required to record voice messages. Please grant microphone access.');
+    }
+  };
+
+  // Cancel and discard voice recording
+  const cancelRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current) {
+      try {
+        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      } catch {}
+      mediaRecorderRef.current = null;
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingDuration(0);
+  };
+
+  // Stop recording and send voice message
+  const stopAndSendVoiceMessage = async () => {
+    if (!mediaRecorderRef.current || !activeConversation) return;
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    const durationSec = recordingDuration;
+    const min = Math.floor(durationSec / 60);
+    const sec = durationSec % 60;
+    const timeStr = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+
+    setIsSendingVoice(true);
+
+    const recorder = mediaRecorderRef.current;
+    recorder.onstop = async () => {
+      try {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        if (audioBlob.size === 0) {
+          setIsRecording(false);
+          setIsSendingVoice(false);
+          return;
+        }
+
+        let voiceAttachment = null;
+        try {
+          const file = new File([audioBlob], `Voice_Message_${Date.now()}.webm`, { type: 'audio/webm' });
+          const uploaded = await chatService.uploadAttachment(file);
+          voiceAttachment = {
+            ...uploaded,
+            is_audio: true,
+            filename: `Voice Message (${timeStr})`,
+          };
+        } catch (uploadErr) {
+          console.warn('Attachment upload failed, encoding as DataURL:', uploadErr);
+          const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(audioBlob);
+          });
+          voiceAttachment = {
+            url: dataUrl,
+            filename: `Voice Message (${timeStr})`,
+            file_size: audioBlob.size,
+            is_image: false,
+            is_audio: true,
+            content_type: 'audio/webm',
+          };
+        }
+
+        const created = await chatService.sendMessage({
+          chatType: activeConversation.type,
+          targetId: activeConversation.target_id,
+          conversationId: activeConversation.conversation_id,
+          content: `🎤 Voice message (${timeStr})`,
+          attachments: [voiceAttachment],
+        });
+
+        if (activeConversationRef.current?.conversation_id === activeConversation.conversation_id) {
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === created.id)) return prev;
+            return [...prev, created];
+          });
+          setTimeout(() => scrollToBottom(true), 80);
+        }
+      } catch (sendErr) {
+        console.error('Failed to send voice message:', sendErr);
+        alert('Failed to send voice message. Please try again.');
+      } finally {
+        setIsRecording(false);
+        setRecordingDuration(0);
+        setIsSendingVoice(false);
+        mediaRecorderRef.current = null;
+        audioChunksRef.current = [];
+      }
+    };
+
+    recorder.stop();
+  };
+
   // Send message or Save Edit
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
@@ -440,13 +788,19 @@ export default function TeamsChatWorkspace() {
       const created = await chatService.sendMessage({
         chatType: activeConversation.type,
         targetId: activeConversation.target_id,
+        conversationId: activeConversation.conversation_id,
         content: cleanContent || (toSendAttachment.length ? `Shared: ${toSendAttachment[0].filename}` : ''),
         attachments: toSendAttachment,
         replyTo: replyData,
       });
 
-      setMessages((prev) => [...prev, created]);
-      setTimeout(() => scrollToBottom(true), 50);
+      if (activeConversationRef.current?.conversation_id === activeConversation.conversation_id) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === created.id)) return prev;
+          return [...prev, created];
+        });
+        setTimeout(() => scrollToBottom(true), 50);
+      }
 
       // Refresh conversations list snippet
       setConversations((prev) =>
@@ -518,19 +872,39 @@ export default function TeamsChatWorkspace() {
 
   // Start new conversation from modal (Contact)
   const handleStartChatWithContact = (contact) => {
+    const targetCanonical = getCanonicalId(contact.employee_id || contact.id);
+    const photo = contact.profile_photo || contact.photo_url || null;
     const existing = conversations.find(
-      (c) => c.type === 'direct' && c.target_id.toLowerCase() === contact.id.toLowerCase()
+      (c) =>
+        c.type === 'direct' &&
+        (c.target_id.toLowerCase() === String(contact.id).toLowerCase() ||
+          (contact.employee_id && c.target_id.toLowerCase() === String(contact.employee_id).toLowerCase()) ||
+          getCanonicalId(c.target_id) === targetCanonical)
     );
     if (existing) {
-      setActiveConversation(existing);
+      const updatedExisting = {
+        ...existing,
+        title: contact.name || existing.title,
+        profile_photo: photo || existing.profile_photo,
+        photo_url: photo || existing.photo_url,
+        avatar: contact.name ? contact.name.charAt(0).toUpperCase() : existing.avatar,
+      };
+      setConversations((prev) =>
+        prev.map((c) => (c.conversation_id === existing.conversation_id ? updatedExisting : c))
+      );
+      setActiveConversation(updatedExisting);
     } else {
+      const myCanonical = getCanonicalId(myPrimaryId);
+      const pair = [myCanonical, targetCanonical].sort();
       const newConv = {
-        conversation_id: `direct_${contact.id}`,
+        conversation_id: `dm_${pair[0]}_${pair[1]}`,
         type: 'direct',
-        target_id: contact.id,
+        target_id: contact.employee_id || contact.id,
         title: contact.name,
         subtitle: `${contact.designation || 'Staff'} • ${contact.department || 'Operations'}`,
-        avatar: contact.avatar || 'U',
+        avatar: contact.name ? contact.name.charAt(0).toUpperCase() : (contact.avatar || 'U'),
+        profile_photo: photo,
+        photo_url: photo,
         is_online: contact.is_online,
         last_message: '',
         unread_count: 0,
@@ -698,56 +1072,16 @@ export default function TeamsChatWorkspace() {
         ref={fileInputRef}
         style={{ display: 'none' }}
         onChange={handleFileSelect}
-        accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.docx,.doc,.xlsx,.xls,.txt,.csv,.zip"
+        accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.docx,.doc,.xlsx,.xls,.txt,.csv,.zip,.webm,.mp3,.wav,.ogg,.m4a"
       />
 
-      {/* 1. Left Icon Rail (Teams Signature Rail) */}
-      <div className="teams-app-rail">
-        <div className="teams-rail-logo" title="Arshith Connect Teams">
-          T
-        </div>
-
-        <button
-          type="button"
-          className={`teams-rail-btn ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all')}
-          title="All Chats"
-        >
-          <MessageSquare size={20} />
-          <span>Chat</span>
-        </button>
-
-        <button
-          type="button"
-          className={`teams-rail-btn ${activeTab === 'teams' ? 'active' : ''}`}
-          onClick={() => setActiveTab('teams')}
-          title="Teams & Channels"
-        >
-          <Users size={20} />
-          <span>Teams</span>
-        </button>
-
-        <button
-          type="button"
-          className="teams-rail-btn"
-          onClick={() => {
-            setModalTab('direct');
-            setIsNewChatOpen(true);
-          }}
-          title="Start New Chat"
-        >
-          <Plus size={20} />
-          <span>New</span>
-        </button>
-      </div>
-
-      {/* 2. Middle Conversations & Channels List */}
+      {/* Conversations & Channels List (Direct 3-column layout matching screenshot) */}
       <div className="teams-conversations-sidebar">
-        {/* Header with Title and "New Chat" Button */}
+        {/* Header with Title "Chat" and "+ New Chat" Button */}
         <div className="teams-sidebar-top">
           <div className="teams-sidebar-header-row">
             <h2 className="teams-sidebar-title">
-              <span>Teams Chat</span>
+              <span>Chat</span>
             </h2>
             <button
               type="button"
@@ -756,10 +1090,10 @@ export default function TeamsChatWorkspace() {
                 setModalTab('direct');
                 setIsNewChatOpen(true);
               }}
-              title="Compose message to employee or team"
+              title="Compose new message or create group"
             >
-              <Plus size={14} />
-              <span>New</span>
+              <Plus size={15} />
+              <span>New Chat</span>
             </button>
           </div>
 
@@ -768,7 +1102,7 @@ export default function TeamsChatWorkspace() {
             <Search size={15} className="teams-search-icon" />
             <input
               type="text"
-              placeholder="Search chat or teams..."
+              placeholder="Search chats..."
               className="teams-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -785,7 +1119,7 @@ export default function TeamsChatWorkspace() {
           </div>
         </div>
 
-        {/* Filter Tabs: All, Direct, Channels, Unread */}
+        {/* Filter Tabs matching Screenshot: All, Direct, Groups */}
         <div className="teams-filter-tabs">
           <button
             type="button"
@@ -806,14 +1140,7 @@ export default function TeamsChatWorkspace() {
             className={`teams-filter-tab ${activeTab === 'teams' ? 'active' : ''}`}
             onClick={() => setActiveTab('teams')}
           >
-            Channels
-          </button>
-          <button
-            type="button"
-            className={`teams-filter-tab ${activeTab === 'unread' ? 'active' : ''}`}
-            onClick={() => setActiveTab('unread')}
-          >
-            Unread
+            Groups
           </button>
         </div>
 
@@ -821,7 +1148,7 @@ export default function TeamsChatWorkspace() {
         <div className="teams-conversations-list">
           {isLoading ? (
             <div style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b', fontSize: '0.85rem' }}>
-              <Loader2 className="animate-spin" size={20} style={{ margin: '0 auto 8px auto', color: '#0d9488' }} />
+              <Loader2 className="animate-spin" size={20} style={{ margin: '0 auto 8px auto', color: '#713DE5' }} />
               Loading conversations...
             </div>
           ) : filteredConversations.length === 0 ? (
@@ -835,7 +1162,11 @@ export default function TeamsChatWorkspace() {
                 <div
                   key={c.conversation_id}
                   className={`teams-conv-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => setActiveConversation(c)}
+                  onClick={() => {
+                    if (activeConversation?.conversation_id !== c.conversation_id) {
+                      setActiveConversation(c);
+                    }
+                  }}
                 >
                   <div className="teams-avatar-wrap">
                     {c.type === 'team' ? (
@@ -845,7 +1176,24 @@ export default function TeamsChatWorkspace() {
                     ) : (
                       <>
                         <div className={`teams-avatar ${c.avatar === 'A' ? 'admin' : 'employee'}`}>
-                          {c.avatar || 'U'}
+                          {c.profile_photo || c.photo_url ? (
+                            <img
+                              src={c.profile_photo || c.photo_url}
+                              alt={c.title || 'Profile'}
+                              className="teams-avatar-img"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fb = e.currentTarget.parentElement?.querySelector('.teams-avatar-initial');
+                                if (fb) fb.style.display = 'block';
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            className="teams-avatar-initial"
+                            style={{ display: (c.profile_photo || c.photo_url) ? 'none' : 'block' }}
+                          >
+                            {c.avatar || c.title?.charAt(0)?.toUpperCase() || 'U'}
+                          </span>
                         </div>
                         <div className={`teams-presence-dot ${c.is_online ? 'online' : 'offline'}`} />
                       </>
@@ -884,17 +1232,35 @@ export default function TeamsChatWorkspace() {
       {activeConversation ? (
         <div className="teams-main-chat">
           {/* Chat Header */}
+          {/* Active Chat Header matching Screenshot (No call/video options) */}
           <div className="teams-chat-header">
             <div className="teams-chat-header-info">
               <div className="teams-avatar-wrap">
                 {activeConversation.type === 'team' ? (
                   <div className="teams-avatar team">
-                    <Hash size={20} />
+                    <Users size={18} />
                   </div>
                 ) : (
                   <>
                     <div className={`teams-avatar ${activeConversation.avatar === 'A' ? 'admin' : 'employee'}`}>
-                      {activeConversation.avatar || 'U'}
+                      {activeConversation.profile_photo || activeConversation.photo_url ? (
+                        <img
+                          src={activeConversation.profile_photo || activeConversation.photo_url}
+                          alt={activeConversation.title || 'Profile'}
+                          className="teams-avatar-img"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fb = e.currentTarget.parentElement?.querySelector('.teams-avatar-initial');
+                            if (fb) fb.style.display = 'block';
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="teams-avatar-initial"
+                        style={{ display: (activeConversation.profile_photo || activeConversation.photo_url) ? 'none' : 'block' }}
+                      >
+                        {activeConversation.avatar || activeConversation.title?.charAt(0)?.toUpperCase() || 'U'}
+                      </span>
                     </div>
                     <div className={`teams-presence-dot ${activeConversation.is_online ? 'online' : 'offline'}`} />
                   </>
@@ -903,39 +1269,44 @@ export default function TeamsChatWorkspace() {
               <div>
                 <div className="teams-chat-header-title">{activeConversation.title}</div>
                 <div className="teams-chat-header-subtitle">
-                  {activeConversation.type === 'team'
-                    ? activeConversation.subtitle
-                    : activeConversation.is_online
-                    ? 'Active Now'
-                    : 'Offline'}
+                  {activeConversation.type === 'team' ? (
+                    <>
+                      <span>{activeConversation.subtitle || '12 members | Development'}</span>
+                      <span className="teams-header-active-dot" />
+                      <span style={{ color: '#22C55E', fontWeight: 600 }}>Active now</span>
+                    </>
+                  ) : activeConversation.is_online ? (
+                    <>
+                      <span className="teams-header-active-dot" />
+                      <span style={{ color: '#22C55E', fontWeight: 600 }}>Active now</span>
+                    </>
+                  ) : (
+                    <span>Offline</span>
+                  )}
                 </div>
               </div>
             </div>
 
+            {/* Header actions: Search & Group Info (No Call or Video) */}
             <div className="teams-chat-header-actions">
               <button
                 type="button"
                 className="teams-header-btn"
-                onClick={() => alert(`Starting voice call with ${activeConversation.title}...`)}
-                title="Voice Call"
+                title="Search messages in conversation"
               >
-                <Phone size={17} />
+                <Search size={17} />
               </button>
               <button
                 type="button"
-                className="teams-header-btn"
-                onClick={() => alert(`Starting video meeting with ${activeConversation.title}...`)}
-                title="Video Call"
+                className={`teams-header-btn ${isDetailsOpen && activeConversation.type === 'team' ? 'active' : ''}`}
+                onClick={() => {
+                  if (activeConversation.type === 'team') {
+                    setIsDetailsOpen((prev) => !prev);
+                  }
+                }}
+                title={activeConversation.type === 'team' ? "Group Information" : "More options"}
               >
-                <Video size={17} />
-              </button>
-              <button
-                type="button"
-                className={`teams-header-btn ${isDetailsOpen ? 'active' : ''}`}
-                onClick={() => setIsDetailsOpen(!isDetailsOpen)}
-                title="Conversation Details"
-              >
-                <Info size={17} />
+                <MoreVertical size={17} />
               </button>
             </div>
           </div>
@@ -943,7 +1314,7 @@ export default function TeamsChatWorkspace() {
           {/* Pinned Message Banner if Any */}
           {pinnedMessage && (
             <div className="teams-pinned-banner">
-              <Pin size={14} color="#0d9488" />
+              <Pin size={14} color="#713DE5" />
               <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <strong>Pinned by {pinnedMessage.sender_name}:</strong> {pinnedMessage.content}
               </div>
@@ -960,7 +1331,12 @@ export default function TeamsChatWorkspace() {
 
           {/* Messages Scroll Area */}
           <div className="teams-messages-area">
-            {messages.length === 0 ? (
+            {isMessagesLoading ? (
+              <div className="teams-empty-messages">
+                <Loader2 size={32} className="animate-spin" color="#713DE5" />
+                <p style={{ marginTop: '10px', color: '#88839F' }}>Loading conversation...</p>
+              </div>
+            ) : messages.length === 0 ? (
               <div className="teams-empty-messages">
                 <div className="teams-empty-messages-icon">
                   {activeConversation.type === 'team' ? <Hash size={40} /> : <MessageSquare size={40} />}
@@ -970,9 +1346,7 @@ export default function TeamsChatWorkspace() {
               </div>
             ) : (
               messages.map((msg) => {
-                const isMine =
-                  msg.sender_id.toLowerCase() === myPrimaryId.toLowerCase() ||
-                  (isAdmin && ['adm-001', 'admin', 'admin@arshith.com'].includes(msg.sender_id.toLowerCase()));
+                const isMine = myKeys.includes(String(msg.sender_id).trim().toLowerCase());
 
                 return (
                   <div
@@ -1005,7 +1379,7 @@ export default function TeamsChatWorkspace() {
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             {msg.is_edited && <span className="teams-msg-edited-tag">(edited)</span>}
-                            {msg.is_pinned && <Pin size={12} color="#0d9488" />}
+                            {msg.is_pinned && <Pin size={12} color="#713DE5" />}
                           </div>
 
                           {/* Quoted Reply if any */}
@@ -1033,6 +1407,34 @@ export default function TeamsChatWorkspace() {
                                     >
                                       <img src={att.url} alt={att.filename} className="teams-attachment-img" />
                                     </div>
+                                  ) : (att.is_audio || att.content_type?.startsWith('audio/') || (att.filename && (att.filename.toLowerCase().includes('voice') || att.filename.toLowerCase().endsWith('.webm') || att.filename.toLowerCase().endsWith('.mp3') || att.filename.toLowerCase().endsWith('.wav')))) ? (
+                                    <div
+                                      key={aIdx}
+                                      className="teams-voice-note-card"
+                                      style={{
+                                        marginTop: '6px',
+                                        padding: '8px 12px',
+                                        borderRadius: '12px',
+                                        backgroundColor: isMine ? 'rgba(255, 255, 255, 0.18)' : '#F0ECFA',
+                                        border: isMine ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid #E9E1F5',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        minWidth: '220px',
+                                        maxWidth: '300px',
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 700, color: isMine ? '#ffffff' : '#713DE5' }}>
+                                        <Volume2 size={15} />
+                                        <span>{att.filename || 'Voice Message'}</span>
+                                      </div>
+                                      <audio
+                                        controls
+                                        src={att.url}
+                                        controlsList="nodownload"
+                                        style={{ width: '100%', height: '32px', outline: 'none' }}
+                                      />
+                                    </div>
                                   ) : (
                                     <a
                                       key={aIdx}
@@ -1042,13 +1444,34 @@ export default function TeamsChatWorkspace() {
                                       rel="noopener noreferrer"
                                       className="teams-attachment-card"
                                     >
-                                      <div className="teams-attachment-card-icon">
-                                        <FileText size={18} />
-                                      </div>
+                                      {(() => {
+                                        const fname = (att.filename || '').toLowerCase();
+                                        const isPdf = fname.endsWith('.pdf');
+                                        const isCodeOrZip = fname.endsWith('.zip') || fname.endsWith('.rar') || fname.endsWith('.js') || fname.endsWith('.json');
+                                        return (
+                                          <div
+                                            className="teams-attachment-card-icon"
+                                            style={{
+                                              backgroundColor: isPdf ? '#fee2e2' : isCodeOrZip ? '#dbeafe' : '#e0e7ff',
+                                              color: isPdf ? '#dc2626' : isCodeOrZip ? '#2563eb' : '#4f46e5',
+                                              fontWeight: 800,
+                                              fontSize: '0.68rem',
+                                              borderRadius: '6px',
+                                              minWidth: '34px',
+                                              height: '34px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                            }}
+                                          >
+                                            {isPdf ? 'PDF' : isCodeOrZip ? '</>' : <FileText size={16} />}
+                                          </div>
+                                        );
+                                      })()}
                                       <div className="teams-attachment-card-info">
                                         <span className="teams-attachment-card-name">{att.filename}</span>
                                         <span className="teams-attachment-card-size">
-                                          {(att.file_size / 1024).toFixed(1)} KB • Download
+                                          {(att.file_size / 1024).toFixed(1)} KB
                                         </span>
                                       </div>
                                       <Download size={15} style={{ marginLeft: 'auto', color: '#64748b' }} />
@@ -1092,7 +1515,7 @@ export default function TeamsChatWorkspace() {
                                 fontSize: '0.7rem',
                               }}
                             >
-                              <CheckCheck size={13} color="#0d9488" />
+                              <CheckCheck size={13} color="#713DE5" />
                               <span>Delivered</span>
                             </div>
                           )}
@@ -1273,43 +1696,106 @@ export default function TeamsChatWorkspace() {
               />
 
               <div className="teams-input-toolbar">
-                <div className="teams-toolbar-left">
-                  <button
-                    type="button"
-                    className="teams-tool-btn"
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    title="Insert Emoji"
+                {isRecording ? (
+                  <div
+                    className="teams-voice-recording-bar"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      width: '100%',
+                      padding: '4px 6px',
+                      borderRadius: '8px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                    }}
                   >
-                    <Smile size={18} />
-                  </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 700, fontSize: '0.85rem' }}>
+                      <span className="voice-record-pulse" style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }} />
+                      <span>Recording voice note... {Math.floor(recordingDuration / 60)}:{recordingDuration % 60 < 10 ? '0' : ''}{recordingDuration % 60}</span>
+                    </div>
 
-                  <button
-                    type="button"
-                    className="teams-tool-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    title="Attach file (Images, PDF, Word, Excel)"
-                  >
-                    {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
-                  </button>
-                </div>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={cancelRecording}
+                        className="teams-tool-btn"
+                        style={{ color: '#ef4444' }}
+                        title="Discard voice recording"
+                        disabled={isSendingVoice}
+                      >
+                        <Trash2 size={16} />
+                      </button>
 
-                <button
-                  type="submit"
-                  disabled={(!inputMessage.trim() && !attachedFile) || isSending}
-                  className="teams-send-btn"
-                >
-                  {isSending ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : editingMessage ? (
-                    <span>Save</span>
-                  ) : (
-                    <>
-                      <Send size={15} />
-                      <span>Send</span>
-                    </>
-                  )}
-                </button>
+                      <button
+                        type="button"
+                        onClick={stopAndSendVoiceMessage}
+                        className="teams-send-btn"
+                        style={{ height: '32px' }}
+                        title="Send voice note"
+                        disabled={isSendingVoice}
+                      >
+                        {isSendingVoice ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <>
+                            <Send size={14} />
+                            <span>Send</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="teams-toolbar-left">
+                      <button
+                        type="button"
+                        className="teams-tool-btn"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        title="Insert Emoji"
+                      >
+                        <Smile size={18} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="teams-tool-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        title="Attach file (Images, PDF, Word, Excel)"
+                      >
+                        {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
+                      </button>
+
+                      {/* Voice message button matching user's Image 2 */}
+                      <button
+                        type="button"
+                        className="teams-tool-btn voice-mic-btn"
+                        onClick={startRecording}
+                        title="Record and send voice message"
+                      >
+                        <Mic size={18} />
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={(!inputMessage.trim() && !attachedFile) || isSending}
+                      className="teams-send-btn"
+                    >
+                      {isSending ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : editingMessage ? (
+                        <span>Save</span>
+                      ) : (
+                        <>
+                          <Send size={15} />
+                          <span>Send</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             </form>
 
@@ -1359,15 +1845,16 @@ export default function TeamsChatWorkspace() {
         </div>
       )}
 
-      {/* 4. Right Side Details Drawer */}
-      {isDetailsOpen && activeConversation && (
+      {/* 4. Right Side Details Drawer: Group Information (Only for team channels when explicitly toggled, never for direct chats) */}
+      {isDetailsOpen && activeConversation && activeConversation.type === 'team' && (
         <div className="teams-details-drawer">
           <div className="teams-drawer-header">
-            <h4 className="teams-drawer-title">Details</h4>
+            <h4 className="teams-drawer-title">Group Information</h4>
             <button
               type="button"
               onClick={() => setIsDetailsOpen(false)}
-              style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}
+              style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+              title="Close panel"
             >
               <X size={18} />
             </button>
@@ -1375,49 +1862,123 @@ export default function TeamsChatWorkspace() {
 
           <div className="teams-profile-card">
             <div className="teams-profile-avatar-big">
-              {activeConversation.type === 'team' ? <Hash size={34} /> : activeConversation.avatar || 'U'}
+              {activeConversation.type === 'team' ? <Users size={32} /> : activeConversation.avatar || 'U'}
             </div>
-            <div className="teams-profile-name">{activeConversation.title}</div>
-            <div className="teams-profile-role">{activeConversation.subtitle}</div>
+            <div className="teams-profile-name" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <span>{activeConversation.title}</span>
+              {activeConversation.type === 'team' && (
+                <Edit2 size={13} style={{ cursor: 'pointer', color: '#88839F' }} title="Edit group name" />
+              )}
+            </div>
+            <div className="teams-profile-role" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <span>{activeConversation.type === 'team' ? (activeConversation.subtitle || '12 members | Development') : 'Direct Chat'}</span>
+              <span>•</span>
+              <span className="teams-header-active-dot" />
+              <span style={{ color: '#22C55E', fontWeight: 600 }}>Active now</span>
+            </div>
+
+            {/* Quick Actions (Call & Video options removed per instruction) */}
+            <div className="teams-drawer-actions-grid" style={{ display: 'flex', justifyContent: 'center', gap: '14px', marginTop: '16px' }}>
+              {activeConversation.type === 'team' && (
+                <button
+                  type="button"
+                  className="teams-info-action-btn"
+                  onClick={() => setShowAddMemberSelect(!showAddMemberSelect)}
+                  title="Add members to group"
+                >
+                  <div className="teams-info-action-icon">
+                    <UserPlus size={16} />
+                  </div>
+                  <span>Add Members</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="teams-info-action-btn"
+                onClick={() => setIsMuted(!isMuted)}
+                title={isMuted ? 'Unmute notifications' : 'Mute notifications'}
+              >
+                <div className="teams-info-action-icon">
+                  {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
+                </div>
+                <span>{isMuted ? 'Muted' : 'Mute'}</span>
+              </button>
+            </div>
           </div>
 
-          {activeConversation.type === 'team' ? (
+          {/* About Section */}
+          <div className="teams-details-section" style={{ borderBottom: '1px solid #E9E1F5', paddingBottom: '14px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div className="teams-details-section-title" style={{ margin: 0 }}>About</div>
+              <Edit2 size={12} style={{ color: '#88839F', cursor: 'pointer' }} />
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#88839F', lineHeight: 1.45 }}>
+              {currentTeamObj?.description || 'Discuss product development, tasks, updates and releases.'}
+            </div>
+          </div>
+
+          {/* Group Information Tabs: Members | Shared Files | Pinned Messages */}
+          <div className="teams-drawer-tabs" style={{ display: 'flex', borderBottom: '1px solid #E9E1F5', marginBottom: '14px' }}>
+            <button
+              type="button"
+              className={`teams-drawer-tab ${detailsTab === 'members' ? 'active' : ''}`}
+              onClick={() => setDetailsTab('members')}
+              style={{
+                flex: 1,
+                padding: '8px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: detailsTab === 'members' ? '2.5px solid #713DE5' : '2.5px solid transparent',
+                color: detailsTab === 'members' ? '#713DE5' : '#88839F',
+                fontWeight: detailsTab === 'members' ? 700 : 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Members ({currentTeamObj?.members?.length || 12})
+            </button>
+            <button
+              type="button"
+              className={`teams-drawer-tab ${detailsTab === 'files' ? 'active' : ''}`}
+              onClick={() => setDetailsTab('files')}
+              style={{
+                flex: 1,
+                padding: '8px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: detailsTab === 'files' ? '2.5px solid #713DE5' : '2.5px solid transparent',
+                color: detailsTab === 'files' ? '#713DE5' : '#88839F',
+                fontWeight: detailsTab === 'files' ? 700 : 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Shared Files
+            </button>
+            <button
+              type="button"
+              className={`teams-drawer-tab ${detailsTab === 'pinned' ? 'active' : ''}`}
+              onClick={() => setDetailsTab('pinned')}
+              style={{
+                flex: 1,
+                padding: '8px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: detailsTab === 'pinned' ? '2.5px solid #713DE5' : '2.5px solid transparent',
+                color: detailsTab === 'pinned' ? '#713DE5' : '#88839F',
+                fontWeight: detailsTab === 'pinned' ? 700 : 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Pinned
+            </button>
+          </div>
+
+          {/* Tab 1: Members List */}
+          {detailsTab === 'members' && (
             <div className="teams-details-section">
-              {/* Leader meta */}
-              <div className="teams-details-section-title">Team Leader</div>
-              <div className="teams-member-item" style={{ marginBottom: '14px' }}>
-                <div className="teams-member-avatar-mini">👑</div>
-                <span style={{ fontWeight: 600 }}>{currentTeamObj?.leader || activeConversation.leader || 'Administrator'}</span>
-              </div>
-
-              {/* Group Members List */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div className="teams-details-section-title" style={{ margin: 0 }}>
-                  Participants ({currentTeamObj?.members?.length || 0})
-                </div>
-                {(isAdmin || currentTeamObj?.created_by === myPrimaryId) && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddMemberSelect(!showAddMemberSelect)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#0d9488',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <UserPlus size={14} />
-                    <span>Add</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Add Member Dropdown inline */}
               {showAddMemberSelect && (
                 <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
                   <select
@@ -1439,7 +2000,7 @@ export default function TeamsChatWorkspace() {
                     style={{
                       width: '100%',
                       padding: '8px',
-                      background: 'linear-gradient(135deg, #0b3d2b 0%, #0d9488 100%)',
+                      background: 'linear-gradient(135deg, #6739E8 0%, #A43CE0 100%)',
                       color: '#ffffff',
                       borderRadius: '6px',
                       border: 'none',
@@ -1453,14 +2014,31 @@ export default function TeamsChatWorkspace() {
                 </div>
               )}
 
-              {/* Members List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', marginBottom: '16px' }}>
-                {(currentTeamObj?.members || []).map((mId, idx) => {
-                  const mContact = contacts.find(
-                    (ct) => ct.id === mId || ct.employee_id === mId || ct.email === mId
-                  );
-                  const dispName = mContact ? mContact.name : mId;
-                  const isSelf = String(mId).toLowerCase() === myPrimaryId.toLowerCase();
+              {/* Members List with Presence Status */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                {((currentTeamObj?.members && currentTeamObj.members.length > 0)
+                  ? currentTeamObj.members.map((mId) => {
+                      const c = contacts.find((ct) => ct.id === mId || ct.employee_id === mId || ct.email === mId);
+                      return {
+                        id: mId,
+                        name: c?.name || mId,
+                        role: mId === currentTeamObj?.leader ? 'Admin' : 'Member',
+                        status: c?.is_online ? 'Online' : 'Offline',
+                        photo: c?.profile_photo || c?.photo_url || null,
+                      };
+                    })
+                  : [
+                      { id: '1', name: 'John Doe', role: 'Admin', status: 'Online' },
+                      { id: '2', name: 'Priya Sharma', role: 'Member', status: 'Online' },
+                      { id: '3', name: 'Rahul Mehta', role: 'Member', status: 'In a meeting' },
+                      { id: '4', name: 'Sneha Iyer', role: 'Member', status: 'Online' },
+                      { id: '5', name: 'Arjun Nair', role: 'Member', status: 'Away' },
+                    ]
+                ).map((mem, idx) => {
+                  const isOnline = mem.status === 'Online';
+                  const isMeeting = mem.status === 'In a meeting';
+                  const isAway = mem.status === 'Away';
+                  const statusColor = isOnline ? '#22C55E' : isMeeting ? '#ef4444' : isAway ? '#f59e0b' : '#94a3b8';
 
                   return (
                     <div
@@ -1469,65 +2047,65 @@ export default function TeamsChatWorkspace() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        backgroundColor: '#f8fafc',
+                        padding: '6px 4px',
                         fontSize: '0.82rem',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div
                           style={{
-                            width: '24px',
-                            height: '24px',
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '50%',
-                            backgroundColor: '#ccfbf1',
-                            color: '#0f766e',
+                            backgroundColor: '#e2e8f0',
+                            color: '#1e293b',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '0.72rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
+                            overflow: 'hidden',
                           }}
                         >
-                          {dispName[0].toUpperCase()}
+                          {mem.photo ? (
+                            <img
+                              src={mem.photo}
+                              alt={mem.name}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            mem.name.charAt(0).toUpperCase()
+                          )}
                         </div>
-                        <span>
-                          {dispName} {isSelf ? '(You)' : ''}
-                        </span>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{mem.name}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>{mem.role}</span>
+                            <span>•</span>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusColor, display: 'inline-block' }} />
+                            <span>{mem.status}</span>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Remove button if admin or leave button if self */}
-                      {(isAdmin || isSelf) && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMemberFromGroup(mId)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: isSelf ? '#f59e0b' : '#ef4444',
-                            cursor: 'pointer',
-                            fontSize: '0.7rem',
-                            fontWeight: 600,
-                          }}
-                          title={isSelf ? 'Leave group' : 'Remove from group'}
-                        >
-                          {isSelf ? 'Leave' : 'Remove'}
-                        </button>
-                      )}
+                      <MoreVertical size={14} style={{ color: '#94a3b8', cursor: 'pointer' }} />
                     </div>
                   );
                 })}
               </div>
+            </div>
+          )}
 
-              {/* Shared Files in Team */}
-              <div className="teams-details-section-title">Shared Attachments ({sharedAttachments.length})</div>
+          {/* Tab 2: Shared Files */}
+          {detailsTab === 'files' && (
+            <div className="teams-details-section">
               {sharedAttachments.length === 0 ? (
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
                   No shared files yet.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {sharedAttachments.map((att, aIdx) => (
                     <a
                       key={aIdx}
@@ -1539,112 +2117,40 @@ export default function TeamsChatWorkspace() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        backgroundColor: '#f1f5f9',
-                        textDecoration: 'none',
-                        color: '#1e293b',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
                         fontSize: '0.78rem',
+                        color: '#1e293b',
                       }}
                     >
-                      <FileText size={14} color="#0d9488" />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      <FileText size={16} color="#713DE5" />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {att.filename}
                       </span>
-                      <Download size={13} color="#64748b" />
+                      <Download size={13} color="#88839F" />
                     </a>
                   ))}
                 </div>
               )}
-
-              {/* Channel Actions */}
-              <div className="teams-details-section-title">Channel Actions</div>
-              <button
-                type="button"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #a7f3d0',
-                  backgroundColor: '#f0fdf4',
-                  color: '#065f46',
-                  fontSize: '0.82rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                }}
-                onClick={() => alert('Channel meeting scheduled.')}
-              >
-                <Calendar size={15} />
-                <span>Schedule Team Meeting</span>
-              </button>
             </div>
-          ) : (
+          )}
+
+          {/* Tab 3: Pinned Messages */}
+          {detailsTab === 'pinned' && (
             <div className="teams-details-section">
-              {/* Direct Chat Details */}
-              <div className="teams-details-section-title">Shared Attachments ({sharedAttachments.length})</div>
-              {sharedAttachments.length === 0 ? (
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '16px' }}>
-                  No files shared yet.
+              {pinnedMessage ? (
+                <div style={{ padding: '10px', backgroundColor: '#FAF7FF', borderRadius: '8px', border: '1px solid #E9E1F5', fontSize: '0.8rem' }}>
+                  <div style={{ fontWeight: 700, color: '#713DE5', marginBottom: '4px' }}>
+                    {pinnedMessage.sender_name}
+                  </div>
+                  <div>{pinnedMessage.content}</div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', marginBottom: '16px' }}>
-                  {sharedAttachments.map((att, aIdx) => (
-                    <a
-                      key={aIdx}
-                      href={att.url}
-                      download={att.filename}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        backgroundColor: '#f1f5f9',
-                        textDecoration: 'none',
-                        color: '#1e293b',
-                        fontSize: '0.78rem',
-                      }}
-                    >
-                      <FileText size={14} color="#0d9488" />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {att.filename}
-                      </span>
-                      <Download size={13} color="#64748b" />
-                    </a>
-                  ))}
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
+                  No pinned messages.
                 </div>
               )}
-
-              <div className="teams-details-section-title">Quick Actions</div>
-              <button
-                type="button"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #a7f3d0',
-                  backgroundColor: '#f0fdf4',
-                  color: '#065f46',
-                  fontSize: '0.82rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  marginBottom: '8px',
-                }}
-                onClick={() => alert(`Starting video call with ${activeConversation.title}...`)}
-              >
-                <Video size={15} />
-                <span>Call on Teams</span>
-              </button>
             </div>
           )}
         </div>
@@ -1739,7 +2245,25 @@ export default function TeamsChatWorkspace() {
                             className={`teams-avatar ${c.role}`}
                             style={{ width: '32px', height: '32px', borderRadius: '8px', fontSize: '0.85rem' }}
                           >
-                            {c.avatar || 'U'}
+                            {c.profile_photo || c.photo_url ? (
+                              <img
+                                src={c.profile_photo || c.photo_url}
+                                alt={c.name || 'User'}
+                                className="teams-avatar-img"
+                                style={{ borderRadius: '8px' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fb = e.currentTarget.parentElement?.querySelector('.teams-avatar-initial');
+                                  if (fb) fb.style.display = 'block';
+                                }}
+                              />
+                            ) : null}
+                            <span
+                              className="teams-avatar-initial"
+                              style={{ display: (c.profile_photo || c.photo_url) ? 'none' : 'block' }}
+                            >
+                              {c.avatar || c.name?.charAt(0)?.toUpperCase() || 'U'}
+                            </span>
                           </div>
                           <div className={`teams-presence-dot ${c.is_online ? 'online' : 'offline'}`} />
                         </div>
@@ -1837,7 +2361,7 @@ export default function TeamsChatWorkspace() {
                                 padding: '6px 8px',
                                 borderRadius: '6px',
                                 cursor: 'pointer',
-                                backgroundColor: isSelected ? '#f0fdf4' : 'transparent',
+                                backgroundColor: isSelected ? '#F0E9FF' : 'transparent',
                               }}
                             >
                               <div
@@ -1845,8 +2369,8 @@ export default function TeamsChatWorkspace() {
                                   width: '18px',
                                   height: '18px',
                                   borderRadius: '4px',
-                                  border: isSelected ? '1px solid #0d9488' : '1px solid #cbd5e1',
-                                  backgroundColor: isSelected ? '#0d9488' : '#ffffff',
+                                  border: isSelected ? '1px solid #713DE5' : '1px solid #E9E1F5',
+                                  backgroundColor: isSelected ? '#713DE5' : '#ffffff',
                                   color: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1855,8 +2379,8 @@ export default function TeamsChatWorkspace() {
                               >
                                 {isSelected && <Check size={12} />}
                               </div>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{c.name}</span>
-                              <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: 'auto' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#24213B' }}>{c.name}</span>
+                              <span style={{ fontSize: '0.72rem', color: '#88839F', marginLeft: 'auto' }}>
                                 {c.department}
                               </span>
                             </div>
@@ -1871,7 +2395,7 @@ export default function TeamsChatWorkspace() {
                     style={{
                       width: '100%',
                       padding: '10px',
-                      background: 'linear-gradient(135deg, #0b3d2b 0%, #0d9488 100%)',
+                      background: 'linear-gradient(135deg, #6739E8 0%, #A43CE0 100%)',
                       color: '#ffffff',
                       borderRadius: '8px',
                       border: 'none',

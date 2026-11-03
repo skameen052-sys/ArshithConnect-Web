@@ -168,9 +168,20 @@ def login_employee(login_data: LoginRequest, db: Session = Depends(get_db)):
                 detail="Admin credentials cannot be used to log in through Employee Login. Please use the Admin Login page.",
             )
 
-        pg_emp = db.query(Employee).filter(func.lower(func.trim(Employee.email)) == clean_email).first() if db else None
-        pg_user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_email).first() if db else None
-        pg_req = db.query(RegistrationRequest).filter(func.lower(func.trim(RegistrationRequest.email)) == clean_email).first() if db else None
+        pg_emp = None
+        pg_user = None
+        pg_req = None
+        if db:
+            try:
+                pg_emp = db.query(Employee).filter(func.lower(func.trim(Employee.email)) == clean_email).first()
+                pg_user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_email).first()
+                pg_req = db.query(RegistrationRequest).filter(func.lower(func.trim(RegistrationRequest.email)) == clean_email).first()
+            except Exception as pg_err:
+                logger.warning(f"PostgreSQL status check skipped during login for {clean_email}: {pg_err}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
 
         # Check for explicitly deactivated accounts
         is_inactive = (
@@ -237,6 +248,7 @@ def login_employee(login_data: LoginRequest, db: Session = Depends(get_db)):
         emp_id = (emp.get("employee_id") or emp.get("employeeId")) if emp else "EMP-001"
         emp_name = (emp.get("full_name") or emp.get("fullName")) if emp else clean_email.split("@")[0]
         emp_dept = emp.get("department", "Operations") if emp else "Operations"
+        emp_photo = emp.get("profile_photo") or emp.get("profilePhoto") or None if emp else None
         emp_uid = (fb_result.get("uid") if fb_result else None) or (user.get("id") if user else None) or "EMP-001"
 
         token = create_access_token(
@@ -261,13 +273,26 @@ def login_employee(login_data: LoginRequest, db: Session = Depends(get_db)):
                 "email": clean_email,
                 "role": "employee",
                 "department": emp_dept,
+                "profile_photo": emp_photo,
+                "profilePhoto": emp_photo,
             },
         }
 
     # PostgreSQL fallback
-    user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_email).first()
-    emp = db.query(Employee).filter(func.lower(func.trim(Employee.email)) == clean_email).first()
-    reg_req = db.query(RegistrationRequest).filter(func.lower(func.trim(RegistrationRequest.email)) == clean_email).first()
+    user = None
+    emp = None
+    reg_req = None
+    if db:
+        try:
+            user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_email).first()
+            emp = db.query(Employee).filter(func.lower(func.trim(Employee.email)) == clean_email).first()
+            reg_req = db.query(RegistrationRequest).filter(func.lower(func.trim(RegistrationRequest.email)) == clean_email).first()
+        except Exception as pg_err:
+            logger.warning(f"PostgreSQL fallback query skipped: {pg_err}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
     has_account = bool(user or emp or reg_req)
 
@@ -340,6 +365,8 @@ def login_employee(login_data: LoginRequest, db: Session = Depends(get_db)):
         },
     )
 
+    emp_photo = getattr(emp, "profile_photo", None) if emp else None
+
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -352,6 +379,8 @@ def login_employee(login_data: LoginRequest, db: Session = Depends(get_db)):
             "email": user.email,
             "role": "employee",
             "department": emp_dept,
+            "profile_photo": emp_photo,
+            "profilePhoto": emp_photo,
         },
     }
 

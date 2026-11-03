@@ -31,6 +31,11 @@ def format_employee_response(emp: Any, db: Optional[Session] = None) -> dict:
         shift = emp.get("shift") or "General (09:30 AM - 06:30 PM)"
         location = emp.get("location") or "HQ Office"
         pct = emp.get("attendance_percentage") or emp.get("attendancePercentage")
+        bank_name = emp.get("bank_name") or emp.get("bankName") or ""
+        acct_no = emp.get("account_number") or emp.get("accountNumber") or emp.get("bank_account_no") or ""
+        pan_no = emp.get("pan_number") or emp.get("panNumber") or emp.get("pan") or ""
+        uan_no = emp.get("uan_number") or emp.get("uanNumber") or emp.get("uan") or emp.get("pf_number") or ""
+        photo = emp.get("profile_photo") or emp.get("profilePhoto") or emp.get("photo_url") or emp.get("avatar") or ""
 
         return {
             "id": emp_id,
@@ -48,6 +53,19 @@ def format_employee_response(emp: Any, db: Optional[Session] = None) -> dict:
             "shift": shift,
             "location": location,
             "attendancePercentage": pct,
+            "bank_name": bank_name,
+            "bankName": bank_name,
+            "account_number": acct_no,
+            "accountNumber": acct_no,
+            "pan_number": pan_no,
+            "panNumber": pan_no,
+            "pan": pan_no,
+            "uan_number": uan_no,
+            "uanNumber": uan_no,
+            "uan": uan_no,
+            "pf_number": uan_no,
+            "profile_photo": photo,
+            "profilePhoto": photo,
         }
 
     # SQLAlchemy model
@@ -58,6 +76,12 @@ def format_employee_response(emp: Any, db: Optional[Session] = None) -> dict:
         .count()
     ) if db else 0
     pct = round((present_att / total_att) * 100, 1) if total_att > 0 else None
+
+    bank_name = getattr(emp, "bank_name", None) or ""
+    acct_no = getattr(emp, "account_number", None) or ""
+    pan_no = getattr(emp, "pan_number", None) or ""
+    uan_no = getattr(emp, "uan_number", None) or ""
+    photo = getattr(emp, "profile_photo", None) or ""
 
     return {
         "id": emp.employee_id,
@@ -75,6 +99,19 @@ def format_employee_response(emp: Any, db: Optional[Session] = None) -> dict:
         "shift": emp.shift or "General (09:30 AM - 06:30 PM)",
         "location": emp.location or "HQ Office",
         "attendancePercentage": pct if emp.attendance_percentage is None else emp.attendance_percentage,
+        "bank_name": bank_name,
+        "bankName": bank_name,
+        "account_number": acct_no,
+        "accountNumber": acct_no,
+        "pan_number": pan_no,
+        "panNumber": pan_no,
+        "pan": pan_no,
+        "uan_number": uan_no,
+        "uanNumber": uan_no,
+        "uan": uan_no,
+        "pf_number": uan_no,
+        "profile_photo": photo,
+        "profilePhoto": photo,
     }
 
 
@@ -202,6 +239,14 @@ def create_employee(
             "status": emp_data.status or "Active",
             "shift": emp_data.shift or "General (09:30 AM - 06:30 PM)",
             "location": emp_data.location or "HQ Office",
+            "bank_name": (emp_data.bank_name or emp_data.bankName or "").strip(),
+            "bankName": (emp_data.bank_name or emp_data.bankName or "").strip(),
+            "account_number": (emp_data.account_number or emp_data.accountNumber or "").strip(),
+            "accountNumber": (emp_data.account_number or emp_data.accountNumber or "").strip(),
+            "pan_number": (emp_data.pan_number or emp_data.panNumber or emp_data.pan or "").strip().upper(),
+            "panNumber": (emp_data.pan_number or emp_data.panNumber or emp_data.pan or "").strip().upper(),
+            "uan_number": (emp_data.uan_number or emp_data.uanNumber or emp_data.uan or emp_data.pf_number or "").strip(),
+            "uanNumber": (emp_data.uan_number or emp_data.uanNumber or emp_data.uan or emp_data.pf_number or "").strip(),
             "created_at": now_iso,
             "updated_at": now_iso,
         }
@@ -244,6 +289,10 @@ def create_employee(
         status=emp_data.status or "Active",
         shift=emp_data.shift or "General (09:30 AM - 06:30 PM)",
         location=emp_data.location or "HQ Office",
+        bank_name=(emp_data.bank_name or emp_data.bankName or None),
+        account_number=(emp_data.account_number or emp_data.accountNumber or None),
+        pan_number=(emp_data.pan_number or emp_data.panNumber or emp_data.pan or None),
+        uan_number=(emp_data.uan_number or emp_data.uanNumber or emp_data.uan or emp_data.pf_number or None),
     )
     db.add(new_emp)
     db.commit()
@@ -291,8 +340,48 @@ def update_my_profile(
         if data.fullName or data.name:
             updates["full_name"] = (data.fullName or data.name).strip()
             updates["name"] = (data.fullName or data.name).strip()
+        if data.role or data.designation:
+            updates["designation"] = (data.role or data.designation).strip()
+            updates["role"] = (data.role or data.designation).strip()
+        if data.bank_name is not None or data.bankName is not None:
+            val = (data.bank_name if data.bank_name is not None else data.bankName).strip()
+            updates["bank_name"] = val
+            updates["bankName"] = val
+        if data.account_number is not None or data.accountNumber is not None:
+            val = (data.account_number if data.account_number is not None else data.accountNumber).strip()
+            updates["account_number"] = val
+            updates["accountNumber"] = val
+            updates["bank_account_no"] = val
+        if data.pan_number is not None or data.panNumber is not None or data.pan is not None:
+            val = (data.pan_number if data.pan_number is not None else (data.panNumber if data.panNumber is not None else data.pan)).strip().upper()
+            updates["pan_number"] = val
+            updates["panNumber"] = val
+            updates["pan"] = val
+        if data.uan_number is not None or data.uanNumber is not None or data.uan is not None or data.pf_number is not None:
+            val = (data.uan_number if data.uan_number is not None else (data.uanNumber if data.uanNumber is not None else (data.uan if data.uan is not None else data.pf_number))).strip()
+            updates["uan_number"] = val
+            updates["uanNumber"] = val
+            updates["uan"] = val
+            updates["pf_number"] = val
+        if data.profile_photo is not None or data.profilePhoto is not None:
+            photo_val = data.profile_photo if data.profile_photo is not None else data.profilePhoto
+            updates["profile_photo"] = photo_val
+            updates["profilePhoto"] = photo_val
+            updates["photoUrl"] = photo_val
+            updates["photo_url"] = photo_val
+
         FirestoreService.update("employees", str(target_doc_id), updates)
         emp.update(updates)
+
+        try:
+            from app.routers.chat import notify_profile_updated
+            emp_canonical = emp.get("employee_id") or emp.get("employeeId") or str(target_doc_id)
+            updated_name = emp.get("full_name") or emp.get("name")
+            updated_photo = updates.get("profile_photo") or emp.get("profile_photo") or emp.get("photoUrl")
+            notify_profile_updated(str(target_doc_id), emp_canonical, updated_photo, updated_name)
+        except Exception:
+            pass
+
         return format_employee_response(emp)
 
     # PostgreSQL fallback
@@ -300,9 +389,28 @@ def update_my_profile(
         employee.phone = data.phone.strip()
     if data.fullName or data.name:
         employee.full_name = (data.fullName or data.name).strip()
+    if data.role or data.designation:
+        employee.designation = (data.role or data.designation).strip()
+    if data.bank_name is not None or data.bankName is not None:
+        employee.bank_name = (data.bank_name if data.bank_name is not None else data.bankName).strip()
+    if data.account_number is not None or data.accountNumber is not None:
+        employee.account_number = (data.account_number if data.account_number is not None else data.accountNumber).strip()
+    if data.pan_number is not None or data.panNumber is not None or data.pan is not None:
+        employee.pan_number = (data.pan_number if data.pan_number is not None else (data.panNumber if data.panNumber is not None else data.pan)).strip().upper()
+    if data.uan_number is not None or data.uanNumber is not None or data.uan is not None or data.pf_number is not None:
+        employee.uan_number = (data.uan_number if data.uan_number is not None else (data.uanNumber if data.uanNumber is not None else (data.uan if data.uan is not None else data.pf_number))).strip()
+    if data.profile_photo is not None or data.profilePhoto is not None:
+        employee.profile_photo = data.profile_photo if data.profile_photo is not None else data.profilePhoto
 
     db.commit()
     db.refresh(employee)
+
+    try:
+        from app.routers.chat import notify_profile_updated
+        notify_profile_updated(str(employee.id), employee.employee_id, employee.profile_photo, employee.full_name)
+    except Exception:
+        pass
+
     return format_employee_response(employee, db)
 
 
@@ -369,6 +477,30 @@ def update_employee(
             updates["shift"] = data.shift.strip()
         if data.location is not None:
             updates["location"] = data.location.strip()
+        if data.bank_name is not None or data.bankName is not None:
+            val = (data.bank_name if data.bank_name is not None else data.bankName).strip()
+            updates["bank_name"] = val
+            updates["bankName"] = val
+        if data.account_number is not None or data.accountNumber is not None:
+            val = (data.account_number if data.account_number is not None else data.accountNumber).strip()
+            updates["account_number"] = val
+            updates["accountNumber"] = val
+            updates["bank_account_no"] = val
+        if data.pan_number is not None or data.panNumber is not None or data.pan is not None:
+            val = (data.pan_number if data.pan_number is not None else (data.panNumber if data.panNumber is not None else data.pan)).strip().upper()
+            updates["pan_number"] = val
+            updates["panNumber"] = val
+            updates["pan"] = val
+        if data.uan_number is not None or data.uanNumber is not None or data.uan is not None or data.pf_number is not None:
+            val = (data.uan_number if data.uan_number is not None else (data.uanNumber if data.uanNumber is not None else (data.uan if data.uan is not None else data.pf_number))).strip()
+            updates["uan_number"] = val
+            updates["uanNumber"] = val
+            updates["uan"] = val
+            updates["pf_number"] = val
+        if data.profile_photo is not None or data.profilePhoto is not None:
+            photo_val = data.profile_photo if data.profile_photo is not None else data.profilePhoto
+            updates["profile_photo"] = photo_val
+            updates["profilePhoto"] = photo_val
 
         FirestoreService.update("employees", doc_key, updates)
         emp.update(updates)
@@ -404,6 +536,16 @@ def update_employee(
         emp.shift = data.shift.strip()
     if data.location is not None:
         emp.location = data.location.strip()
+    if data.bank_name is not None or data.bankName is not None:
+        emp.bank_name = (data.bank_name if data.bank_name is not None else data.bankName).strip()
+    if data.account_number is not None or data.accountNumber is not None:
+        emp.account_number = (data.account_number if data.account_number is not None else data.accountNumber).strip()
+    if data.pan_number is not None or data.panNumber is not None or data.pan is not None:
+        emp.pan_number = (data.pan_number if data.pan_number is not None else (data.panNumber if data.panNumber is not None else data.pan)).strip().upper()
+    if data.uan_number is not None or data.uanNumber is not None or data.uan is not None or data.pf_number is not None:
+        emp.uan_number = (data.uan_number if data.uan_number is not None else (data.uanNumber if data.uanNumber is not None else (data.uan if data.uan is not None else data.pf_number))).strip()
+    if data.profile_photo is not None or data.profilePhoto is not None:
+        emp.profile_photo = data.profile_photo if data.profile_photo is not None else data.profilePhoto
 
     db.commit()
     db.refresh(emp)

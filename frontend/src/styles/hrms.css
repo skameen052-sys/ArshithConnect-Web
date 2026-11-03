@@ -8,6 +8,8 @@
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .hrms-page-header {
@@ -174,6 +176,8 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   margin-bottom: 1.5rem;
   overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .hrms-card-header {
@@ -184,6 +188,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
+  box-sizing: border-box;
 }
 
 .hrms-card-title {
@@ -198,16 +203,21 @@
 
 .hrms-card-body {
   padding: 1.5rem;
+  box-sizing: border-box;
 }
 
 /* Data Tables */
 .hrms-table-container {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 .hrms-table {
   width: 100%;
+  min-width: 650px;
   border-collapse: collapse;
   text-align: left;
   font-size: 0.875rem;
@@ -334,25 +344,29 @@
 .hrms-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.5);
+  background-color: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1050;
-  padding: 1rem;
+  z-index: 2000;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .hrms-modal-content {
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 16px;
   width: 100%;
   max-width: 600px;
-  max-height: 90vh;
+  max-height: min(90vh, calc(100dvh - 32px));
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .hrms-modal-content.lg {
@@ -362,7 +376,7 @@
 .hrms-modal-content form {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
@@ -400,9 +414,14 @@
 .hrms-modal-body {
   padding: 1.5rem;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .hrms-modal-footer {
+  flex-shrink: 0;
   padding: 1rem 1.5rem;
   border-top: 1px solid #f1f5f9;
   display: flex;
@@ -415,6 +434,9 @@
 /* Form Groups */
 .hrms-form-group {
   margin-bottom: 1.125rem;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hrms-form-group label {
@@ -429,11 +451,13 @@
 .hrms-form-group select,
 .hrms-form-group textarea {
   width: 100%;
+  max-width: 100%;
   padding: 0.625rem 0.875rem;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 0.875rem;
   color: #0f172a;
+  box-sizing: border-box;
 }
 
 .hrms-form-group input:focus,
@@ -471,10 +495,28 @@
   .hrms-metrics-grid {
     grid-template-columns: 1fr;
   }
+  .hrms-form-row {
+    grid-template-columns: 1fr;
+  }
   .hrms-actions-group {
     width: 100%;
   }
   .hrms-actions-group button {
     flex: 1;
+  }
+  .hrms-card-header {
+    padding: 1rem;
+  }
+  .hrms-card-body {
+    padding: 1rem;
+  }
+  .hrms-modal-content {
+    max-height: calc(100dvh - 20px);
+    border-radius: 12px;
+  }
+  .hrms-modal-header,
+  .hrms-modal-body,
+  .hrms-modal-footer {
+    padding: 1rem;
   }
 }

@@ -1,5 +1,6 @@
 @import './styles/variables.css';
 @import './styles/hrms.css';
+@import './styles/animations.css';
 
 /* Global Reset & Base Styling */
 *, *::before, *::after {

@@ -45,28 +45,34 @@ export const chatService = {
   /**
    * Fetch message history for a direct chat or team channel
    */
-  async getMessages(chatType, targetId, limit = 60) {
-    const res = await api.get('/api/chat/messages', {
-      params: {
-        chat_type: chatType,
-        target_id: targetId,
-        limit,
-      },
-    });
+  async getMessages(chatType, targetId, limit = 60, conversationId = null) {
+    const params = {
+      chat_type: chatType,
+      target_id: targetId,
+      limit,
+    };
+    if (conversationId) {
+      params.conversation_id = conversationId;
+    }
+    const res = await api.get('/api/chat/messages', { params });
     return res.data;
   },
 
   /**
    * Send a new message to direct user or team channel
    */
-  async sendMessage({ chatType, targetId, content, attachments = [], replyTo = null }) {
-    const res = await api.post('/api/chat/messages', {
+  async sendMessage({ chatType, targetId, conversationId = null, content, attachments = [], replyTo = null }) {
+    const payload = {
       chat_type: chatType,
       target_id: targetId,
       content,
       attachments,
       reply_to: replyTo,
-    });
+    };
+    if (conversationId) {
+      payload.conversation_id = conversationId;
+    }
+    const res = await api.post('/api/chat/messages', payload);
     return res.data;
   },
 
@@ -153,11 +159,15 @@ export const chatService = {
   /**
    * Mark all messages in a conversation as read
    */
-  async markRead(chatType, targetId) {
-    const res = await api.post('/api/chat/read', {
+  async markRead(chatType, targetId, conversationId = null) {
+    const payload = {
       chat_type: chatType,
       target_id: targetId,
-    });
+    };
+    if (conversationId) {
+      payload.conversation_id = conversationId;
+    }
+    const res = await api.post('/api/chat/read', payload);
     return res.data;
   },
 
