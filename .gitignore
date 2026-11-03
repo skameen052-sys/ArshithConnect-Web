@@ -40,6 +40,11 @@ backend/app/static/chat_uploads/*
 *.pdf
 
 # Android Native
+android/
+adb.bat
+adb.cmd
+gradlew
+gradlew.bat
 .gradle/
 local.properties
 *.iml
