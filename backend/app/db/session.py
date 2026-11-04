@@ -1,37 +1,31 @@
-from typing import Generator
+from typing import Generator, Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from app.core.config import settings
+
+# Resilient connection arguments with short timeout to prevent blocking when PostgreSQL is offline
+connect_args = {}
+if "psycopg" in settings.DATABASE_URL:
+    connect_args["connect_timeout"] = 3
 
 # Engine with resilient, bounded connection pooling tailored for local/production stability
 engine = create_engine(
     settings.DATABASE_URL,
     pool_size=5,
     max_overflow=2,
-    pool_timeout=30,
+    pool_timeout=5,
     pool_pre_ping=True,
     pool_recycle=1800,
+    connect_args=connect_args,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Optional[Session], None, None]:
     """Dependency that provides a clean, request-scoped SQLAlchemy session with guaranteed rollback and cleanup."""
     if settings.DATABASE_BACKEND == "firebase":
-        db = None
-        try:
-            db = SessionLocal()
-        except Exception:
-            pass
-        try:
-            yield db
-        finally:
-            if db:
-                try:
-                    db.close()
-                except Exception:
-                    pass
+        yield None
         return
 
     db = SessionLocal()

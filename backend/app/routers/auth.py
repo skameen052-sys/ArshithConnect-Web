@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, date, timezone
 from typing import Optional
@@ -5,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
+
+logger = logging.getLogger("uvicorn.error")
 
 from pydantic import BaseModel
 

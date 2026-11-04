@@ -64,10 +64,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error during Firebase / Firestore initialization: {e}", exc_info=True)
 
-    # 2. Check legacy PostgreSQL connection non-destructively
+    # 2. Check legacy PostgreSQL connection non-destructively only if postgres backend is selected
     try:
-        if check_db_connection():
-            logger.info("PostgreSQL database connection verified (legacy backend available).")
+        if settings.DATABASE_BACKEND == "postgres" and check_db_connection():
+            logger.info("PostgreSQL database connection verified.")
             try:
                 with engine.connect() as conn:
                     conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_name VARCHAR(150);"))
